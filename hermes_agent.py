@@ -223,16 +223,27 @@ def synthesize_skill_from_task(st: Dict[str, Any], title: str, output: str) -> s
     return slug
 
 
-def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: str = "") -> Dict[str, Any]:
+def run_ollama_inference(
+    st: Dict[str, Any],
+    user_prompt: str,
+    model_override: str = "",
+    agent_name_override: str = "",
+    system_prompt_override: str = "",
+) -> Dict[str, Any]:
     model = model_override or st["active_model"]
+    agent_name = agent_name_override or st["agent_name"]
     skills_context = "\n".join(f"- {s['name']}: {s['description']}" for s in st["skills"][:6])
     memories_context = "\n".join(f"- {m['summary']}" for m in st["memories"][:4])
+    base_role = (
+        system_prompt_override
+        or f"You are {agent_name}, a self-improving autonomous AI agent modeled after Nous Research's Hermes Agent, "
+        f"connected to Paperclip Control Plane and Ollama ({st['ollama_url']})."
+    )
     sys_prompt = (
-        f"You are {st['agent_name']}, a self-improving autonomous AI agent modeled after Nous Research's Hermes Agent, "
-        f"connected to Paperclip Control Plane and Ollama ({st['ollama_url']}).\n"
+        f"{base_role}\n\n"
         f"LEARNED SKILLS VAULT:\n{skills_context}\n\n"
         f"EPISODIC MEMORY:\n{memories_context}\n\n"
-        f"Provide clear, technical, production-ready solutions and conclude with a 1-line 'Learned Skill Takeaway'."
+        f"Provide complete, comprehensive, production-ready solutions with zero truncation and zero placeholders. Conclude with a 1-line 'Learned Skill Takeaway'."
     )
     url = st["ollama_url"].rstrip("/") + "/api/chat"
     payload = {
@@ -242,7 +253,7 @@ def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: s
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "options": {"temperature": 0.3, "num_predict": 2048},
+        "options": {"temperature": 0.3, "num_predict": 8192},
     }
     t0 = time.time()
     req = urllib.request.Request(
@@ -251,7 +262,7 @@ def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: s
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=180) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     duration_ms = round((time.time() - t0) * 1000.0, 1)
     content = (data.get("message", {}).get("content") or "").strip()
@@ -260,7 +271,7 @@ def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: s
         content = f"### [Reasoning & Technical Execution]\n\n{thinking}"
     elif thinking and content and len(thinking) > 30:
         first_few_thoughts = "\n".join(thinking.splitlines()[:12])
-        content = f"<details><summary>🧠 Thought Process</summary>\n\n{first_few_thoughts}\n\n</details>\n\n{content}"
+        content = f"<blockquote>🧠 <b>Reasoning Summary:</b>\n{first_few_thoughts}</blockquote>\n\n{content}"
 
     tokens = int(data.get("eval_count", 0)) + int(data.get("prompt_eval_count", 0))
     return {
@@ -373,10 +384,12 @@ async def execute_paperclip_ticket(payload: Dict[str, Any] = Body(...)):
     title = payload.get("title", "Paperclip Task")
     desc = payload.get("description", "")
     model = payload.get("model") or st["active_model"]
+    req_agent_name = payload.get("agent_name") or st["agent_name"]
+    req_sys_prompt = payload.get("system_prompt") or ""
 
     t0 = time.time()
     steps = [
-        {"step": "Task Ingested", "time": "0.0s", "detail": f"Hermes Agent Bridge received ticket {t_id}: '{title}'"},
+        {"step": "Task Ingested", "time": "0.0s", "detail": f"Hermes Agent Bridge received ticket {t_id} for {req_agent_name}: '{title}'"},
     ]
     skills_used = [s["name"] for s in st["skills"][:4]]
     steps.append({"step": "Skills Vault Prime", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Primed context with {len(skills_used)} active skills: {', '.join(skills_used)}"})
@@ -384,7 +397,7 @@ async def execute_paperclip_ticket(payload: Dict[str, Any] = Body(...)):
 
     full_prompt = f"[PAPERCLIP TICKET {t_id}] {title}\n\n{desc}"
     steps.append({"step": "Ollama Inference Started", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Executing deep inference via {st['ollama_url']} (model: {model})"})
-    res = await asyncio.to_thread(run_ollama_inference, st, full_prompt, model)
+    res = await asyncio.to_thread(run_ollama_inference, st, full_prompt, model, req_agent_name, req_sys_prompt)
     
     elapsed_s = max(0.1, round(time.time() - t0, 2))
     tok_sec = round(res['tokens'] / elapsed_s, 1)
@@ -394,14 +407,14 @@ async def execute_paperclip_ticket(payload: Dict[str, Any] = Body(...)):
     learned_skill = synthesize_skill_from_task(st, title, res["content"])
     steps.append({"step": "Skill Synthesis", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Saved autonomous reusable skill '{learned_skill}' into persistent Skills Vault"})
 
-    memory_summary = f"Completed ticket {t_id} ('{title}') with {model} and synthesized '{learned_skill}'."
+    memory_summary = f"Completed ticket {t_id} ('{title}') with {model} on behalf of {req_agent_name} and synthesized '{learned_skill}'."
     st["tasks_completed"] = st.get("tasks_completed", 0) + 1
     
     completion_log = {
         "id": f"hlog-{str(uuid.uuid4())[:8]}",
         "ticket_id": t_id,
         "title": title,
-        "agent_name": st["agent_name"],
+        "agent_name": req_agent_name,
         "node_id": st["node_id"],
         "model": res["model"],
         "tokens": res["tokens"],

@@ -294,6 +294,20 @@ def load_state() -> Dict[str, Any]:
                     "avatar": "🪽",
                     "system_prompt": "You are Hermes-17, an autonomous self-improving agent running directly on the GPU host at 192.168.0.17. Execute tickets with low latency and synthesize reusable skills."
                 })
+
+            # Harmonize all Hermes agent bots to use hermes_bridge and connect to active node
+            st.setdefault("hermes_for_all_agents", True)
+            for ag in st.get("agents", []):
+                ag_name_l = ag.get("name", "").lower()
+                ag_id_l = ag.get("id", "").lower()
+                if "hermes" in ag_name_l or "hermes" in ag_id_l:
+                    ag["adapter"] = "hermes_bridge"
+                    ag["status"] = "ONLINE"
+                    if not ag.get("endpoint"):
+                        ag["endpoint"] = "http://192.168.0.17:7892"
+                    if not ag.get("avatar") or ag.get("avatar") == "🤖":
+                        ag["avatar"] = "🪽"
+
             return st
         except Exception:
             pass
@@ -392,7 +406,7 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
         ],
         "options": {
             "temperature": 0.3,
-            "num_predict": 2048,
+            "num_predict": 8192,
         },
     }
     t0 = time.time()
@@ -402,7 +416,7 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=180) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     duration_ms = round((time.time() - t0) * 1000.0, 1)
     msg = (data.get("message", {}).get("content") or "").strip()
@@ -412,9 +426,8 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
     if not msg and thinking:
         msg = f"### [Reasoning & Analysis]\n\n{thinking}"
     elif thinking and msg and len(thinking) > 30:
-        # Show concise summary of thinking alongside the deliverable
         first_few_thoughts = "\n".join(thinking.splitlines()[:12])
-        msg = f"<details><summary>🧠 Thought Process</summary>\n\n{first_few_thoughts}\n\n</details>\n\n{msg}"
+        msg = f"<blockquote>🧠 <b>Reasoning Summary:</b>\n{first_few_thoughts}</blockquote>\n\n{msg}"
 
     eval_tokens = int(data.get("eval_count", 0)) + int(data.get("prompt_eval_count", 0))
     return {
@@ -467,21 +480,28 @@ async def connect_ollama(payload: Dict[str, Any] = Body(...)):
 async def save_agent(payload: Dict[str, Any] = Body(...)):
     state = load_state()
     agent_id = payload.get("id") or f"agent-{str(uuid.uuid4())[:6]}"
+    raw_name = (payload.get("name") or "New Agent").strip()
+    is_hermes = "hermes" in raw_name.lower() or "hermes" in agent_id.lower() or payload.get("adapter") == "hermes_bridge"
+    adapter = "hermes_bridge" if is_hermes else (payload.get("adapter") or "ollama_native")
+    endpoint = payload.get("endpoint") or ("http://192.168.0.17:7892" if is_hermes else None)
+    avatar = payload.get("avatar") or ("🪽" if is_hermes else "🤖")
+
     new_agent = {
         "id": agent_id,
-        "name": (payload.get("name") or "New Agent").strip(),
+        "name": raw_name,
         "role": (payload.get("role") or "Autonomous Specialist").strip(),
-        "department": (payload.get("department") or "Engineering").strip(),
+        "department": (payload.get("department") or ("Autonomous Ops" if is_hermes else "Engineering")).strip(),
         "reports_to": payload.get("reports_to") or "agent-cto",
-        "adapter": payload.get("adapter") or "ollama_native",
-        "model": payload.get("model") or "qwen2.5-coder:7b",
-        "status": "ONLINE" if payload.get("adapter") == "hermes_bridge" else "IDLE",
-        "budget_tokens": int(payload.get("budget_tokens", 1000000)),
+        "adapter": adapter,
+        "endpoint": endpoint,
+        "model": payload.get("model") or ("qwen2.5-coder:14b" if is_hermes else "qwen2.5-coder:7b"),
+        "status": "ONLINE" if adapter == "hermes_bridge" else "IDLE",
+        "budget_tokens": int(payload.get("budget_tokens", 2000000 if is_hermes else 1000000)),
         "tokens_used": int(payload.get("tokens_used", 0)),
-        "avatar": payload.get("avatar") or "🤖",
+        "avatar": avatar,
         "system_prompt": payload.get(
             "system_prompt",
-            "You are an autonomous specialist agent in Sovereign AI Corp powered by local Ollama.",
+            f"You are {raw_name}, an autonomous specialist agent in Sovereign AI Corp powered by {'Hermes-Ollama' if is_hermes else 'local Ollama'}.",
         ),
     }
     replaced = False
@@ -600,18 +620,52 @@ def get_telegram_config(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def send_telegram_document(bot_token: str, chat_id: str, filename: str, content_bytes: bytes, caption: str = "") -> bool:
+    """Sends a complete deliverable document to Telegram via multipart/form-data with zero truncation."""
+    if not bot_token or not chat_id:
+        return False
+    boundary = f"----TelegramBoundary{uuid.uuid4().hex}"
+    url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+    
+    body = bytearray()
+    # chat_id
+    body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode("utf-8"))
+    # caption
+    if caption:
+        body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption[:1000]}\r\n".encode("utf-8"))
+    # document
+    body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{filename}\"\r\nContent-Type: text/markdown; charset=utf-8\r\n\r\n".encode("utf-8"))
+    body.extend(content_bytes)
+    body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    
+    req = urllib.request.Request(
+        url,
+        data=bytes(body),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return True
+    except Exception:
+        return False
+
+
 def send_telegram_raw(bot_token: str, chat_id: str, text: str) -> bool:
     if not bot_token or not chat_id:
         return False
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    
+    # Clean split with balanced tags
     chunks = []
     rem = text
-    while len(rem) > 3900:
-        split_idx = rem.rfind("\n", 0, 3900)
+    while len(rem) > 3800:
+        split_idx = rem.rfind("\n", 0, 3800)
         if split_idx == -1 or split_idx < 1000:
-            split_idx = 3900
-        chunks.append(rem[:split_idx])
+            split_idx = 3800
+        chunk = rem[:split_idx]
         rem = rem[split_idx:].lstrip()
+        chunks.append(chunk)
     if rem:
         chunks.append(rem)
 
@@ -625,17 +679,80 @@ def send_telegram_raw(bot_token: str, chat_id: str, text: str) -> bool:
         }).encode("utf-8")
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=12) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 pass
         except Exception:
+            # Fallback to plain text if HTML tags were unclosed/malformed in this chunk
             try:
-                payload = json.dumps({"chat_id": chat_id, "text": c}).encode("utf-8")
+                # Strip out basic tags for clean plain text fallback
+                clean_plain = re.sub(r"<[^>]+>", "", c)
+                payload = json.dumps({"chat_id": chat_id, "text": clean_plain}).encode("utf-8")
                 req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-                with urllib.request.urlopen(req, timeout=12) as resp:
+                with urllib.request.urlopen(req, timeout=15) as resp:
                     pass
             except Exception:
                 ok = False
     return ok
+
+
+def send_telegram_deliverable(
+    bot_token: str,
+    chat_id: str,
+    header_html: str,
+    deliverable_text: str,
+    ticket_id: str = "DELIVERABLE",
+    title: str = "",
+) -> bool:
+    """
+    Delivers full un-truncated deliverables to Telegram:
+    - If total length is within 3800 chars, delivers as 1 single formatted message.
+    - If longer, paginates into clean numbered parts [Part 1/N], each with properly closed <pre> tags.
+    - Also attaches the full 100% untruncated deliverable as a .md document file via Telegram sendDocument.
+    """
+    if not bot_token or not chat_id:
+        return False
+
+    deliv_clean = (deliverable_text or "").strip()
+    if not deliv_clean:
+        deliv_clean = "(Task executed successfully with no textual output)"
+
+    full_single = f"{header_html}\n\n<b>Deliverable:</b>\n<pre>{html.escape(deliv_clean)}</pre>"
+    if len(full_single) <= 3800:
+        return send_telegram_raw(bot_token, chat_id, full_single)
+
+    # Deliverable exceeds standard single message limit -> Paginate cleanly
+    chunk_size = 3000
+    chunks = []
+    rem = deliv_clean
+    while len(rem) > chunk_size:
+        split_idx = rem.rfind("\n", 0, chunk_size)
+        if split_idx == -1 or split_idx < 1200:
+            split_idx = chunk_size
+        chunks.append(rem[:split_idx])
+        rem = rem[split_idx:].lstrip()
+    if rem:
+        chunks.append(rem)
+
+    total_parts = len(chunks)
+
+    # Part 1: Header + First Chunk
+    part1_msg = f"{header_html}\n\n<b>Deliverable [Part 1/{total_parts}]:</b>\n<pre>{html.escape(chunks[0])}</pre>"
+    send_telegram_raw(bot_token, chat_id, part1_msg)
+
+    # Subsequent parts
+    for idx, c in enumerate(chunks[1:], start=2):
+        part_msg = f"<b>Deliverable [Part {idx}/{total_parts}]:</b>\n<pre>{html.escape(c)}</pre>"
+        send_telegram_raw(bot_token, chat_id, part_msg)
+        time.sleep(0.3)
+
+    # Send full un-truncated file attachment
+    safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', title[:32]) if title else "ticket"
+    fn = f"{ticket_id}_{safe_title}.md"
+    file_bytes = f"# {ticket_id}: {title}\n\n{deliv_clean}".encode("utf-8")
+    caption = f"📎 Complete Deliverable File: {ticket_id} ({len(deliv_clean)} chars, {total_parts} parts)"
+    send_telegram_document(bot_token, chat_id, fn, file_bytes, caption)
+
+    return True
 
 
 def telegram_notify_sync(text: str) -> bool:
@@ -701,6 +818,7 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
             # Check if this agent already exists
             existing = next((a for a in state["agents"] if a["name"].lower() == name.lower()), None)
             if not existing:
+                endpoint = "http://192.168.0.17:7892" if adapter == "hermes_bridge" else None
                 new_ag = {
                     "id": f"agent-{name.lower()}-{str(uuid.uuid4())[:4]}",
                     "name": name,
@@ -708,9 +826,10 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
                     "department": dept,
                     "reports_to": "agent-cto",
                     "adapter": adapter,
+                    "endpoint": endpoint,
                     "model": model,
                     "status": "ONLINE" if adapter == "hermes_bridge" else "IDLE",
-                    "budget_tokens": 1500000,
+                    "budget_tokens": 2000000 if adapter == "hermes_bridge" else 1500000,
                     "tokens_used": 0,
                     "avatar": avatar,
                     "system_prompt": f"You are {name}, {role} at Sovereign AI Corp. Execute engineering tasks and write production-ready code with zero placeholders."
@@ -775,8 +894,14 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         if cto_hiring_result:
             save_state(state)
 
-    # Check if delegated to Hermes bridge and Hermes is reachable
-    if agent.get("adapter") == "hermes_bridge":
+    # Check if routed to Hermes bridge or if Hermes is enabled for all bots
+    is_hermes = (
+        agent.get("adapter") in ("hermes_bridge", "hermes")
+        or "hermes" in agent.get("id", "").lower()
+        or "hermes" in agent.get("name", "").lower()
+        or state.get("hermes_for_all_agents", True)
+    )
+    if is_hermes:
         candidate_eps = []
         if agent.get("endpoint"):
             candidate_eps.append(agent["endpoint"])
@@ -786,13 +911,15 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         if active_node and active_node.get("endpoint") and active_node["endpoint"] not in candidate_eps:
             candidate_eps.append(active_node["endpoint"])
             
+        if "http://192.168.0.17:7892" not in candidate_eps:
+            candidate_eps.append("http://192.168.0.17:7892")
+            
         for n in state.get("hermes_nodes", []):
             ep = n.get("endpoint")
             if ep and ep not in candidate_eps:
                 candidate_eps.append(ep)
                 
         fallback_eps = [
-            "http://192.168.0.17:7892",
             os.environ.get("HERMES_URL", "http://hermes.ai.svc.cluster.local:7892"),
             "http://hermes.ai.svc.cluster.local:7892",
             "http://192.168.0.81:30792",
@@ -811,13 +938,15 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                             "ticket_id": ticket["id"],
                             "title": ticket["title"],
                             "description": ticket["description"],
-                            "model": agent["model"],
+                            "model": agent.get("model") or "qwen2.5-coder:14b",
+                            "agent_name": agent["name"],
+                            "system_prompt": agent.get("system_prompt", ""),
                             "ollama_url": state["ollama_url"],
                         }).encode("utf-8"),
                         headers={"Content-Type": "application/json"},
                         method="POST",
                     )
-                    with urllib.request.urlopen(req, timeout=120) as resp:
+                    with urllib.request.urlopen(req, timeout=180) as resp:
                         return json.loads(resp.read().decode("utf-8"))
 
                 h_res = await asyncio.to_thread(_call_hermes)
@@ -877,16 +1006,25 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                 try:
                     tg = get_telegram_config(state)
                     if tg.get("enabled") and tg.get("notify_on_ticket_completed") and tg.get("bot_token") and tg.get("chat_id"):
-                        tg_msg = (
+                        tg_header = (
                             f"📎 <b>Ticket Deliverable Ready: {ticket_id}</b>\n"
                             f"<b>Title:</b> {html.escape(ticket['title'])}\n"
                             f"<b>Agent:</b> {agent.get('avatar', '🪽')} {html.escape(agent['name'])} ({html.escape(agent['role'])})\n"
                             f"<b>Node:</b> <code>{matched_node_id}</code> | <b>Model:</b> <code>{ticket.get('model_used')}</code>\n"
                             f"<b>Learned Skill:</b> <code>{c_log.get('learned_skill', 'autonomous-ops')}</code>\n"
-                            f"<b>Speed:</b> {ticket.get('tokens')} tokens in {ticket.get('duration_ms')} ms\n\n"
-                            f"<b>Deliverable Preview:</b>\n<pre>{html.escape(ticket.get('output', '')[:2800])}</pre>"
+                            f"<b>Speed:</b> {ticket.get('tokens')} tokens in {ticket.get('duration_ms')} ms"
                         )
-                        asyncio.create_task(telegram_notify_async(tg_msg))
+                        asyncio.create_task(
+                            asyncio.to_thread(
+                                send_telegram_deliverable,
+                                tg["bot_token"],
+                                tg["chat_id"],
+                                tg_header,
+                                ticket.get("output", ""),
+                                ticket_id,
+                                ticket["title"],
+                            )
+                        )
                 except Exception:
                     pass
                 return {"ticket": ticket, "state": state}
@@ -932,14 +1070,23 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         try:
             tg = get_telegram_config(state)
             if tg.get("enabled") and tg.get("notify_on_ticket_completed") and tg.get("bot_token") and tg.get("chat_id"):
-                tg_msg = (
+                tg_header = (
                     f"📎 <b>Ticket Deliverable Ready: {ticket_id}</b>\n"
                     f"<b>Title:</b> {html.escape(ticket['title'])}\n"
                     f"<b>Agent:</b> {agent.get('avatar', '🤖')} {html.escape(agent['name'])} ({html.escape(agent['role'])})\n"
-                    f"<b>Model:</b> <code>{ticket.get('model_used')}</code> | <b>Tokens:</b> {ticket.get('tokens')} ({ticket.get('duration_ms')} ms)\n\n"
-                    f"<b>Deliverable Preview:</b>\n<pre>{html.escape(ticket.get('output', '')[:2800])}</pre>"
+                    f"<b>Model:</b> <code>{ticket.get('model_used')}</code> | <b>Tokens:</b> {ticket.get('tokens')} ({ticket.get('duration_ms')} ms)"
                 )
-                asyncio.create_task(telegram_notify_async(tg_msg))
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        send_telegram_deliverable,
+                        tg["bot_token"],
+                        tg["chat_id"],
+                        tg_header,
+                        ticket.get("output", ""),
+                        ticket_id,
+                        ticket["title"],
+                    )
+                )
         except Exception:
             pass
     except Exception as exc:
@@ -1325,14 +1472,17 @@ def telegram_polling_worker():
                             t_done = res.get("ticket", ticket)
                             out_text = t_done.get("output", "")
                             
-                            deliverable_msg = (
-                                f"✅ <b>Deliverable Ready: {tck_id}</b>\n"
-                                f"<b>Objective:</b> {html.escape(t_done.get('title', ''))}\n"
-                                f"<b>Agent:</b> {ag_obj.get('avatar')} {ag_obj.get('name')} (<code>{t_done.get('model_used')}</code>)\n"
-                                f"<b>Speed:</b> {t_done.get('tokens')} tokens in {t_done.get('duration_ms')} ms\n\n"
-                                f"<b>Deliverable:</b>\n<pre>{html.escape(out_text)}</pre>"
-                            )
-                            send_telegram_raw(token, chat_id, deliverable_msg)
+                            st_latest = load_state()
+                            tg_latest = get_telegram_config(st_latest)
+                            # If execute_ticket_internal didn't already dispatch via notify_on_ticket_completed, deliver now
+                            if not (tg_latest.get("enabled") and tg_latest.get("notify_on_ticket_completed")):
+                                tg_header = (
+                                    f"✅ <b>Deliverable Ready: {tck_id}</b>\n"
+                                    f"<b>Objective:</b> {html.escape(t_done.get('title', ''))}\n"
+                                    f"<b>Agent:</b> {ag_obj.get('avatar')} {ag_obj.get('name')} (<code>{t_done.get('model_used')}</code>)\n"
+                                    f"<b>Speed:</b> {t_done.get('tokens')} tokens in {t_done.get('duration_ms')} ms"
+                                )
+                                send_telegram_deliverable(token, chat_id, tg_header, out_text, tck_id, t_done.get("title", ""))
                         except Exception as exc:
                             send_telegram_raw(token, chat_id, f"❌ <b>Execution Error:</b> {html.escape(str(exc))}")
                         finally:

@@ -462,8 +462,10 @@
       <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
       <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
       <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
-      <button class="tab-btn" id="telegramTabBtn" onclick="switchTab('telegram', this)">📱 Telegram (908-845-3667)</button>
-      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678) ↗</button>
+      <button class="tab-btn" id="telegramTabBtn" onclick="switchTab('telegram', this)">📱 Telegram
+        (908-845-3667)</button>
+      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678)
+        ↗</button>
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
@@ -920,7 +922,8 @@
         <div>
           <h2>📱 Telegram Two-Way Agent Swarm Bridge</h2>
           <div style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">
-            Enables your entire AI Company (CEO Atlas, CTO Vega, Hermes GPU Swarm) to talk directly to your Telegram at <strong>908-845-3667</strong>.
+            Enables your entire AI Company (CEO Atlas, CTO Vega, Hermes GPU Swarm) to talk directly to your Telegram at
+            <strong>908-845-3667</strong>.
           </div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -932,19 +935,24 @@
       <!-- ACTIVE TELEGRAM STATUS CARDS -->
       <div class="org-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom:20px;">
         <div class="panel" style="border-color:rgba(14,165,233,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Target Phone Number</div>
-          <div style="font-size:22px; font-weight:800; color:#38bdf8; margin:6px 0; font-family:monospace;" id="tgCardPhone">908-845-3667</div>
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Target Phone
+            Number</div>
+          <div style="font-size:22px; font-weight:800; color:#38bdf8; margin:6px 0; font-family:monospace;"
+            id="tgCardPhone">908-845-3667</div>
           <div style="font-size:12px; color:#34d399;">✓ Dedicated Commander Line</div>
         </div>
 
         <div class="panel" style="border-color:rgba(168,85,247,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Telegram Bot Username</div>
-          <div style="font-size:20px; font-weight:800; color:#c084fc; margin:6px 0; font-family:monospace;" id="tgCardBotUser">@AwaitingToken</div>
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Telegram Bot
+            Username</div>
+          <div style="font-size:20px; font-weight:800; color:#c084fc; margin:6px 0; font-family:monospace;"
+            id="tgCardBotUser">@AwaitingToken</div>
           <div style="font-size:12px; color:var(--text-sub);" id="tgCardBotSub">Set Bot Token below to activate</div>
         </div>
 
         <div class="panel" style="border-color:rgba(16,185,129,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Bridge Status</div>
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Bridge Status
+          </div>
           <div style="font-size:20px; font-weight:800; color:#34d399; margin:6px 0;" id="tgCardStatus">READY</div>
           <div style="font-size:12px; color:var(--text-sub);" id="tgCardChatId">Chat ID: Auto-pairing on /start</div>
         </div>
@@ -957,12 +965,14 @@
             <span>⚙️</span> Bot Credentials & Delivery Settings
           </h3>
           <p style="font-size:12.5px; color:var(--text-sub); margin-bottom:16px;">
-            Configure your Telegram Bot token from <strong>@BotFather</strong>. The Paperclip long-polling daemon runs in the background with zero port forwarding.
+            Configure your Telegram Bot token from <strong>@BotFather</strong>. The Paperclip long-polling daemon runs
+            in the background with zero port forwarding.
           </p>
 
           <div class="field">
             <label>Telegram Bot Token (from @BotFather)</label>
-            <input type="text" id="tgBotTokenInput" class="input-box" placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz" />
+            <input type="text" id="tgBotTokenInput" class="input-box"
+              placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz" />
             <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">
               Create in 30 seconds: open Telegram ➔ message <code>@BotFather</code> ➔ send <code>/newbot</code>.
             </div>
@@ -975,22 +985,26 @@
 
           <div class="field">
             <label>Paired Telegram Chat ID (Optional / Auto-detects on /start)</label>
-            <input type="text" id="tgChatIdInput" class="input-box" placeholder="Auto-populated when you message the bot" />
+            <input type="text" id="tgChatIdInput" class="input-box"
+              placeholder="Auto-populated when you message the bot" />
           </div>
 
           <div style="margin-bottom:16px;">
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer; margin-bottom:8px;">
+            <label
+              style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer; margin-bottom:8px;">
               <input type="checkbox" id="tgNotifyTickets" checked />
               <span>Deliver finished ticket deliverables to Telegram automatically</span>
             </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer;">
+            <label
+              style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer;">
               <input type="checkbox" id="tgNotifyHire" checked />
               <span>Notify Telegram when CTO Vega hires or spawns new agents</span>
             </label>
           </div>
 
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn btn-primary" onclick="saveTelegramConfig()" style="flex:1; justify-content:center; padding:10px;">
+            <button class="btn btn-primary" onclick="saveTelegramConfig()"
+              style="flex:1; justify-content:center; padding:10px;">
               💾 Save & Activate Telegram Bridge
             </button>
             <button class="btn btn-emerald" onclick="sendTelegramTest()" style="padding:10px 16px;">
@@ -1003,13 +1017,16 @@
           <h3 style="margin-bottom:14px; color:#c084fc;">🚀 4-Step Quick Pairing Guide</h3>
           <ol style="font-size:13px; color:var(--text-sub); line-height:1.7; padding-left:18px; margin-bottom:20px;">
             <li>Open the Telegram app on your phone (<strong>908-845-3667</strong>).</li>
-            <li>Search for <strong><code>@BotFather</code></strong> and send <code>/newbot</code> to get your bot name and API Token.</li>
+            <li>Search for <strong><code>@BotFather</code></strong> and send <code>/newbot</code> to get your bot name
+              and API Token.</li>
             <li>Paste your Bot Token into the field on the left and click <strong>Save &amp; Activate</strong>.</li>
             <li>Open your newly created bot in Telegram and send <strong><code>/start</code></strong>.</li>
           </ol>
 
-          <h3 style="margin-bottom:10px; color:var(--cyan); font-size:14px;">💬 Commands You Can Send from Telegram:</h3>
-          <div style="background:#050811; border:1px solid var(--border); border-radius:8px; padding:12px; font-family:monospace; font-size:12px; color:#a7f3d0; line-height:1.6;">
+          <h3 style="margin-bottom:10px; color:var(--cyan); font-size:14px;">💬 Commands You Can Send from Telegram:
+          </h3>
+          <div
+            style="background:#050811; border:1px solid var(--border); border-radius:8px; padding:12px; font-family:monospace; font-size:12px; color:#a7f3d0; line-height:1.6;">
             • <strong>/status</strong> — Swarm status, Ollama latency &amp; active Hermes nodes<br>
             • <strong>/agents</strong> — List all active agents, roles, and assigned LLMs<br>
             • <strong>/nodes</strong> — Check Hermes GPU worker on Host 17 vs K3s<br>
