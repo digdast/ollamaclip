@@ -1,30 +1,225 @@
-# Paperclip-Ollama (`ClipOS`) & Hermes-Ollama (`Hermes-01`)
+<div align="center">
 
-An end-to-end **Zero-Human AI Company Control Plane** (inspired by [paperclip.ing](https://paperclip.ing/)) paired with a **Self-Improving Autonomous Agent** (inspired by Hermes Agent), purpose-built for **1-click connection to Ollama** (`http://192.168.0.17:11434`) and deployed natively on **K3s**.
+# 📎 Paperclip-Ollama (`ClipOS`) & 🪽 Hermes-Agent
 
-## Components
+### Zero-Human AI Company Control Plane & Self-Improving Autonomous Worker Swarm
+**Orchestrate autonomous AI companies powered natively by local Ollama instances with zero external cloud dependencies or per-token charges.**
 
-1. **Paperclip-Ollama (`paperclip_server.py`, Port `7891` / NodePort `30791`)**
-   - **Product Website & Software Host**: Hosts the interactive landing page and downloadable `paperclip-hermes-suite.zip` software bundle (`/download/paperclip-hermes-suite.zip`).
-   - **1-Click Ollama Connector**: Connects directly to `http://192.168.0.17:11434`, discovers all installed GGUF models via `/api/tags`, and binds models to roles in your AI company.
-   - **AI Org Chart & Ticket Dispatch**: Hire AI agents (CEO, CTO, Hermes Worker, QA Auditor, DevOps), dispatch goals/tickets, and execute them live against Ollama or delegate them over the bridge to Hermes.
-   - **Governance & Audit Log**: Built-in human approval gates and full token/latency telemetry.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-Framework-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/Ollama-Local%20LLM-000000?style=for-the-badge&logo=ollama&logoColor=white" />
+  <img src="https://img.shields.io/badge/K3s-Kubernetes%20HA-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" />
+  <img src="https://img.shields.io/badge/Autonomous-Agent%20Swarm-8B5CF6?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" />
+</p>
 
-2. **Hermes-Ollama (`hermes_agent.py`, Port `7892` / NodePort `30792`)**
-   - **1-Click Dual Bridge**: Connects simultaneously to Ollama (`http://192.168.0.17:11434`) and Paperclip (`http://paperclip.ai.svc.cluster.local:7891`).
-   - **Autonomous Heartbeat & Task Execution**: Auto-registers with Paperclip's Org Chart (`agent-hermes`) and executes delegated tickets via `/api/execute_ticket`.
-   - **Self-Improving Skills Vault & Episodic Memory**: Synthesizes reusable procedural skills after every task and persists cross-session memories.
+</div>
 
-## Quick Start (Local)
+---
+
+## 📸 Live Visual Previews
+
+### 1. Paperclip-Ollama Control Plane (`http://192.168.0.81:30791/`)
+*Interactive AI Org Chart, 1-Click Model Reassignment, Autonomous CTO Hiring, and Real-Time Ticket Stream.*
+
+![Paperclip Control Plane](docs/screenshots/paperclip-dashboard.png)
+
+### 2. Hermes Self-Improving Agent Console (`http://192.168.0.17:7892/`)
+*Bare-Metal GPU Agent on Host 17 featuring persistent Skills Vault extraction and cross-session episodic memory.*
+
+![Hermes Agent Console](docs/screenshots/hermes-agent-console.png)
+
+---
+
+## 🌟 Executive Overview
+
+**Paperclip-Ollama** (inspired by [paperclip.ing](https://paperclip.ing/)) and **Hermes-Agent** (inspired by Nous Research's Hermes Agent) provide a complete, sovereign, on-premises AI enterprise suite. 
+
+Unlike traditional LLM wrappers that rely on rate-limited public APIs and costly per-token billing, Paperclip-Ollama runs directly on your local hardware—pre-wired to a dedicated GPU Ollama server (`192.168.0.17:11434`) and deployed across a high-availability K3s Kubernetes cluster (`192.168.0.81 - 87`).
+
+### Core Architecture Loop
+
+```mermaid
+flowchart TD
+    subgraph Users ["👤 Operators & Management"]
+        Browser["Web Browser\nhttp://192.168.0.81:30791"]
+    end
+
+    subgraph ControlPlane ["📎 Paperclip-Ollama Control Plane (K3s: Port 30791)"]
+        UI["Web Dashboard & Org Chart"]
+        Router["Task & Ticket Orchestrator"]
+        Hub["Ollama Hub Downloader\n(ollama.com/library?sort=popular)"]
+        Audit["Governance & Audit Ledger"]
+        ConnSelect["Dynamic Agent Connection Dropdown"]
+    end
+
+    subgraph Agents ["🪽 Autonomous Agent Swarm"]
+        HermesK3s["Hermes-01 (K3s Worker Pod)\nPort 30792"]
+        HermesHost17["Hermes-17 (Debian GPU Host)\nplexadmin@192.168.0.17:7892"]
+        CustomAgent["Custom Remote Agents\nhttp://<host>:<port>"]
+    end
+
+    subgraph LLM ["🦙 Ollama Inference Infrastructure"]
+        OllamaLocal["Local Ollama Service\nhttp://192.168.0.17:11434"]
+        Qwen14B["Qwen 2.5 Coder 14B / 32B"]
+        DeepSeek["DeepSeek-R1 Distill"]
+        Qwen3["Qwen 3.5 / Latest"]
+    end
+
+    Browser --> UI
+    UI --> Router
+    Router --> ConnSelect
+    ConnSelect -->|Active Node Selection| HermesHost17
+    ConnSelect -->|Failover / Cluster Local| HermesK3s
+    ConnSelect -->|Custom Connection| CustomAgent
+
+    HermesHost17 -->|Inference Query| OllamaLocal
+    HermesK3s -->|Inference Query| OllamaLocal
+    CustomAgent -->|Inference Query| OllamaLocal
+
+    OllamaLocal --> Qwen14B
+    OllamaLocal --> DeepSeek
+    OllamaLocal --> Qwen3
+
+    HermesHost17 -->|Synthesize Reusable Skill| Vault["Persistent Skills Vault & Memory"]
+    HermesHost17 -->|Telemetry & Completion Logs| Audit
+    Hub -->|1-Click Model Pull| OllamaLocal
+```
+
+---
+
+## ⚡ Key Capabilities
+
+### 1. 🏢 Visual AI Corporate Org Chart
+- **Executive Hierarchy**: CEO (`Atlas`), CTO (`Vega`), Staff SRE (`Nexus`), Autonomous Worker (`Hermes-01` & `Hermes-17`), and Red-Team Auditor (`Aegis`).
+- **1-Click Model Reassignment**: Point any employee to any model downloaded on your Ollama server (`qwen2.5-coder:14b`, `deepseek-r1:14b`, `llama3.3:70b`, `qwen3.5:latest`) in real-time.
+- **Autonomous CTO Hiring**: Instruct the CTO (*"Hire a Kubernetes storage architect"* or *"Dispatch new Hermes worker"*); the CTO autonomously detects the hiring intent, provisions the agent persona, assigns their reporting structure, and delegates initial tasks.
+
+### 2. 🪽 Dynamic Agent Connection Dropdown
+- **Universal Multi-Node Switcher**: Seamlessly toggle between multiple Hermes or custom agent worker nodes across your LAN or cloud infrastructure from the top connection bar.
+- **Host 17 Direct GPU Offload**: Runs with zero virtualization overhead directly on Debian Linux GPU host (`192.168.0.17:7892`).
+- **1-Click Custom Agent Connector**: Connect to any custom agent endpoint URL; Paperclip automatically probes the node's health, discovers active models, and registers skills into the cluster.
+
+### 3. 🧠 Self-Improving Skills Vault & Episodic Memory
+- **Procedural Skill Synthesis**: Every time Hermes finishes a ticket, it analyzes its deliverable and extracts reusable procedural knowledge into its persistent JSON Skills Vault (`/data/hermes_vault.json`).
+- **Episodic Context**: Maintains cross-session episodic memory to prevent repeating mistakes and accelerate execution velocity over time.
+- **Completion Telemetry Logs**: Detailed execution timelines displaying task ingestion, vault priming, inference latency, token counts, and generated code artifacts.
+
+### 4. 🔥 1-Click Popular Model Downloader (Ollama Hub)
+- **Live Catalog Ingestion**: Scrapes and indexes trending models directly from `https://ollama.com/library?sort=popular` (e.g. `deepseek-r1`, `llama3.1`, `llama3.2`, `llama3.3`, `qwen2.5-coder`, `mistral`, `gemma3`).
+- **Streaming Progress Bars**: Background asynchronous worker downloading GGUF layers with real-time percentage, MB/s throughput, and size telemetry.
+- **Instant Model Deletion & Purging**: Free up VRAM and NVMe storage in one click.
+
+---
+
+## 🗺️ Network & Service Endpoints
+
+| Service / Node | IP & Port | Cluster Address | Role |
+| :--- | :--- | :--- | :--- |
+| **Paperclip Control Plane** | `http://192.168.0.81:30791` | `http://paperclip.ai.svc.cluster.local:7891` | Web UI, Org Chart, Ticket Router |
+| **Hermes Agent (Host 17)** | `http://192.168.0.17:7892` | N/A (Direct Host LAN) | Bare-Metal GPU Autonomous Worker |
+| **Hermes Agent (K3s)** | `http://192.168.0.81:30792` | `http://hermes.ai.svc.cluster.local:7892` | Kubernetes Cluster Local Worker |
+| **Ollama Backend Engine** | `http://192.168.0.17:11434` | N/A (Direct Host LAN) | 15+ GGUF LLMs (Qwen, DeepSeek, Llama) |
+| **n8n Workflow Automation** | `http://192.168.0.81:30678` | `http://n8n.ai.svc.cluster.local:5678` | Autonomous Webhook & Event Automations |
+| **Software Suite Bundle** | `/download/paperclip-hermes-suite.zip` | Same | Standalone 1-Click Hosted ZIP Bundle |
+
+---
+
+## 🚀 Quick Start Guide
+
+### Option A: Local Workstation (Windows, Linux, macOS)
 
 ```bash
+# 1. Clone repository
+git clone https://github.com/ertechlab/ollamaclip.git
+cd ollamaclip
+
+# 2. Install Python dependencies
 pip install -r requirements.txt
-python paperclip_server.py   # Runs on http://localhost:7891
-python hermes_agent.py       # Runs on http://localhost:7892
+
+# 3. Launch Paperclip Control Plane (Port 7891)
+export OLLAMA_URL="http://192.168.0.17:11434"
+python paperclip_server.py
+
+# 4. In a separate terminal, launch Hermes Autonomous Agent (Port 7892)
+export OLLAMA_URL="http://192.168.0.17:11434"
+export PAPERCLIP_URL="http://127.0.0.1:7891"
+python hermes_agent.py
 ```
 
-## K3s Deployment
+### Option B: High-Availability K3s Deployment
+
+Deploy Paperclip, Hermes, and n8n natively into your Kubernetes cluster in the `ai` namespace:
 
 ```bash
+# Apply Paperclip & Hermes manifests
 kubectl apply -f k8s-paperclip-hermes.yaml
+
+# Apply n8n workflow engine
+kubectl apply -f k8s-n8n.yaml
+
+# Verify pod status
+kubectl -n ai get pods,svc -o wide
 ```
+
+### Option C: Bare-Metal GPU Host Systemd Service (`plexadmin@192.168.0.17`)
+
+Install Hermes as a self-healing Linux service running directly alongside Ollama:
+
+```ini
+# /etc/systemd/system/hermes-agent.service
+[Unit]
+Description=Hermes Agent Bridge (Host 192.168.0.17 GPU & Ollama Node)
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=plexadmin
+WorkingDirectory=/home/plexadmin/hermes-bridge
+ExecStart=/home/plexadmin/hermes-bridge-venv/bin/python /home/plexadmin/hermes-bridge/hermes_agent.py
+Restart=always
+RestartSec=5
+Environment=PORT=7892
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=PAPERCLIP_URL=http://192.168.0.81:30791
+Environment=HERMES_SELF_URL=http://192.168.0.17:7892
+Environment=NODE_ID=hermes-host-17
+Environment=AGENT_NAME=Hermes-Host-17
+Environment=DEFAULT_MODEL=qwen2.5-coder:14b
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now hermes-agent
+sudo systemctl status hermes-agent
+```
+
+---
+
+## 📡 REST API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/state` | Returns full control plane state, agents, tickets, and Ollama probe. |
+| `POST` | `/api/ollama/connect` | Updates target Ollama server URL and re-probes models. |
+| `POST` | `/api/tickets` | Creates and dispatches a company ticket with auto-execution. |
+| `POST` | `/api/agents` | Spawns a new customized AI agent into the Org Chart. |
+| `DELETE`| `/api/agents/{id}` | Decommissions an agent from active service. |
+| `GET` | `/api/hermes/nodes` | Returns list of registered Hermes nodes and active selection. |
+| `POST` | `/api/hermes/nodes/select` | Sets active Hermes node connection (`node_id`). |
+| `POST` | `/api/hermes/nodes/connect` | Probes and registers a custom agent endpoint URL. |
+| `DELETE`| `/api/hermes/nodes/{id}` | Unregisters an agent node. |
+| `GET` | `/api/hermes/ticket_logs` | Returns live telemetry and completion execution logs. |
+| `GET` | `/api/ollama/library` | Fetches popular models from `ollama.com/library?sort=popular`. |
+| `POST` | `/api/ollama/pull` | Triggers background streaming model download. |
+| `GET` | `/download/paperclip-hermes-suite.zip` | Streams compressed standalone deployment bundle. |
+
+---
+
+## 📄 License
+MIT License. Built for autonomous self-improving infrastructure operations.
