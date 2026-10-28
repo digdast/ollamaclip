@@ -462,8 +462,8 @@
       <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
       <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
       <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
-      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678)
-        ↗</button>
+      <button class="tab-btn" id="telegramTabBtn" onclick="switchTab('telegram', this)">📱 Telegram (908-845-3667)</button>
+      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678) ↗</button>
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
@@ -476,6 +476,12 @@
         style="background:rgba(168,85,247,0.14); border-color:rgba(168,85,247,0.4); color:#c084fc;">
         <span class="dot" style="background:#a855f7; box-shadow:0 0 8px #a855f7;"></span>
         <span id="agentStatusText">Agent: Connecting...</span>
+      </div>
+      <div class="ollama-pill" id="telegramStatusPill"
+        style="background:rgba(14,165,233,0.14); border-color:rgba(14,165,233,0.4); color:#38bdf8; cursor:pointer;"
+        onclick="switchTab('telegram', document.getElementById('telegramTabBtn'))">
+        <span class="dot" style="background:#38bdf8; box-shadow:0 0 8px #38bdf8;"></span>
+        <span id="telegramStatusText">Telegram: 908-845-3667</span>
       </div>
     </div>
   </header>
@@ -908,6 +914,112 @@
       <div class="panel" id="auditList"></div>
     </section>
 
+    <!-- VIEW 6: TELEGRAM TWO-WAY BOT & AGENT SWARM BRIDGE -->
+    <section class="view-section" id="view-telegram">
+      <div class="sec-hdr">
+        <div>
+          <h2>📱 Telegram Two-Way Agent Swarm Bridge</h2>
+          <div style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">
+            Enables your entire AI Company (CEO Atlas, CTO Vega, Hermes GPU Swarm) to talk directly to your Telegram at <strong>908-845-3667</strong>.
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-emerald" onclick="sendTelegramTest()">⚡ Send Test Alert to Telegram</button>
+          <button class="btn" onclick="loadTelegramStatus()">🔄 Refresh Status</button>
+        </div>
+      </div>
+
+      <!-- ACTIVE TELEGRAM STATUS CARDS -->
+      <div class="org-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom:20px;">
+        <div class="panel" style="border-color:rgba(14,165,233,0.4);">
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Target Phone Number</div>
+          <div style="font-size:22px; font-weight:800; color:#38bdf8; margin:6px 0; font-family:monospace;" id="tgCardPhone">908-845-3667</div>
+          <div style="font-size:12px; color:#34d399;">✓ Dedicated Commander Line</div>
+        </div>
+
+        <div class="panel" style="border-color:rgba(168,85,247,0.4);">
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Telegram Bot Username</div>
+          <div style="font-size:20px; font-weight:800; color:#c084fc; margin:6px 0; font-family:monospace;" id="tgCardBotUser">@AwaitingToken</div>
+          <div style="font-size:12px; color:var(--text-sub);" id="tgCardBotSub">Set Bot Token below to activate</div>
+        </div>
+
+        <div class="panel" style="border-color:rgba(16,185,129,0.4);">
+          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Bridge Status</div>
+          <div style="font-size:20px; font-weight:800; color:#34d399; margin:6px 0;" id="tgCardStatus">READY</div>
+          <div style="font-size:12px; color:var(--text-sub);" id="tgCardChatId">Chat ID: Auto-pairing on /start</div>
+        </div>
+      </div>
+
+      <!-- TELEGRAM SETUP & CONFIGURATION PANEL -->
+      <div class="split-grid">
+        <div class="panel" style="border-color:rgba(14,165,233,0.35);">
+          <h3 style="margin-bottom:12px; color:#38bdf8; display:flex; align-items:center; gap:8px;">
+            <span>⚙️</span> Bot Credentials & Delivery Settings
+          </h3>
+          <p style="font-size:12.5px; color:var(--text-sub); margin-bottom:16px;">
+            Configure your Telegram Bot token from <strong>@BotFather</strong>. The Paperclip long-polling daemon runs in the background with zero port forwarding.
+          </p>
+
+          <div class="field">
+            <label>Telegram Bot Token (from @BotFather)</label>
+            <input type="text" id="tgBotTokenInput" class="input-box" placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz" />
+            <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">
+              Create in 30 seconds: open Telegram ➔ message <code>@BotFather</code> ➔ send <code>/newbot</code>.
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Target Phone Number / Account</label>
+            <input type="text" id="tgPhoneInput" class="input-box" value="908-845-3667" />
+          </div>
+
+          <div class="field">
+            <label>Paired Telegram Chat ID (Optional / Auto-detects on /start)</label>
+            <input type="text" id="tgChatIdInput" class="input-box" placeholder="Auto-populated when you message the bot" />
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer; margin-bottom:8px;">
+              <input type="checkbox" id="tgNotifyTickets" checked />
+              <span>Deliver finished ticket deliverables to Telegram automatically</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); cursor:pointer;">
+              <input type="checkbox" id="tgNotifyHire" checked />
+              <span>Notify Telegram when CTO Vega hires or spawns new agents</span>
+            </label>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="saveTelegramConfig()" style="flex:1; justify-content:center; padding:10px;">
+              💾 Save & Activate Telegram Bridge
+            </button>
+            <button class="btn btn-emerald" onclick="sendTelegramTest()" style="padding:10px 16px;">
+              ⚡ Send Test Alert
+            </button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 style="margin-bottom:14px; color:#c084fc;">🚀 4-Step Quick Pairing Guide</h3>
+          <ol style="font-size:13px; color:var(--text-sub); line-height:1.7; padding-left:18px; margin-bottom:20px;">
+            <li>Open the Telegram app on your phone (<strong>908-845-3667</strong>).</li>
+            <li>Search for <strong><code>@BotFather</code></strong> and send <code>/newbot</code> to get your bot name and API Token.</li>
+            <li>Paste your Bot Token into the field on the left and click <strong>Save &amp; Activate</strong>.</li>
+            <li>Open your newly created bot in Telegram and send <strong><code>/start</code></strong>.</li>
+          </ol>
+
+          <h3 style="margin-bottom:10px; color:var(--cyan); font-size:14px;">💬 Commands You Can Send from Telegram:</h3>
+          <div style="background:#050811; border:1px solid var(--border); border-radius:8px; padding:12px; font-family:monospace; font-size:12px; color:#a7f3d0; line-height:1.6;">
+            • <strong>/status</strong> — Swarm status, Ollama latency &amp; active Hermes nodes<br>
+            • <strong>/agents</strong> — List all active agents, roles, and assigned LLMs<br>
+            • <strong>/nodes</strong> — Check Hermes GPU worker on Host 17 vs K3s<br>
+            • <strong>/hire &lt;role&gt;</strong> — Ask CTO Vega to autonomously hire a specialist<br>
+            • <strong>Any Text</strong> — Dispatches a live ticket to Hermes/Ollama and streams deliverable back!
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <script>
@@ -932,6 +1044,7 @@
       const res = await fetch('/api/state');
       appData = await res.json();
       renderAll();
+      loadTelegramStatus();
     }
 
     function renderAll() {
@@ -1319,6 +1432,111 @@
         }
       } catch (e) {
         alert('Error disconnecting agent node: ' + e);
+      }
+    }
+
+    // --- TELEGRAM INTEGRATION METHODS ---
+    async function loadTelegramStatus() {
+      try {
+        const res = await fetch('/api/telegram');
+        const data = await res.json();
+        if (data.ok && data.telegram) {
+          const tg = data.telegram;
+          const phone = tg.target_phone || '908-845-3667';
+          const cardPhone = document.getElementById('tgCardPhone');
+          if (cardPhone) cardPhone.textContent = phone;
+          const phoneInp = document.getElementById('tgPhoneInput');
+          if (phoneInp) phoneInp.value = phone;
+
+          const pill = document.getElementById('telegramStatusText');
+          if (pill) {
+            pill.textContent = tg.bot_username
+              ? `Telegram: @${tg.bot_username} (${phone})`
+              : `Telegram: ${phone}`;
+          }
+
+          const cardBot = document.getElementById('tgCardBotUser');
+          const cardSub = document.getElementById('tgCardBotSub');
+          if (cardBot && cardSub) {
+            if (tg.bot_username) {
+              cardBot.textContent = '@' + tg.bot_username;
+              cardSub.textContent = 'Bot verified & online';
+            } else {
+              cardBot.textContent = '@AwaitingToken';
+              cardSub.textContent = 'Paste Bot Token below to activate';
+            }
+          }
+
+          const cardStatus = document.getElementById('tgCardStatus');
+          if (cardStatus) cardStatus.textContent = tg.status;
+          const cardChat = document.getElementById('tgCardChatId');
+          if (cardChat) {
+            cardChat.textContent = tg.chat_id
+              ? `Paired Chat ID: ${tg.chat_id}`
+              : 'Chat ID: Auto-pairing on /start';
+          }
+
+          const chatIdInp = document.getElementById('tgChatIdInput');
+          if (chatIdInp && tg.chat_id) chatIdInp.value = tg.chat_id;
+          const tokenInp = document.getElementById('tgBotTokenInput');
+          if (tokenInp && tg.bot_token_masked && !tokenInp.value) {
+            tokenInp.placeholder = tg.bot_token_masked;
+          }
+          const notifTck = document.getElementById('tgNotifyTickets');
+          if (notifTck) notifTck.checked = tg.notify_on_ticket_completed !== false;
+          const notifHire = document.getElementById('tgNotifyHire');
+          if (notifHire) notifHire.checked = tg.notify_on_hire !== false;
+        }
+      } catch (e) {
+        console.error('Failed to load Telegram status:', e);
+      }
+    }
+
+    async function saveTelegramConfig() {
+      const token = document.getElementById('tgBotTokenInput').value.trim();
+      const phone = document.getElementById('tgPhoneInput').value.trim() || '908-845-3667';
+      const chatId = document.getElementById('tgChatIdInput').value.trim();
+      const notifyTickets = document.getElementById('tgNotifyTickets').checked;
+      const notifyHire = document.getElementById('tgNotifyHire').checked;
+
+      const payload = {
+        target_phone: phone,
+        notify_on_ticket_completed: notifyTickets,
+        notify_on_hire: notifyHire
+      };
+      if (token) payload.bot_token = token;
+      if (chatId) payload.chat_id = chatId;
+
+      try {
+        const res = await fetch('/api/telegram/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert('Telegram settings successfully saved and activated!');
+          await loadTelegramStatus();
+          await loadState();
+        } else {
+          alert(data.detail || 'Failed to update Telegram settings');
+        }
+      } catch (e) {
+        alert('Error saving Telegram configuration: ' + e);
+      }
+    }
+
+    async function sendTelegramTest() {
+      try {
+        const res = await fetch('/api/telegram/test', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          alert('Success: ' + data.message);
+        } else {
+          alert(data.detail || 'Failed to send test alert');
+        }
+      } catch (e) {
+        alert('Error sending Telegram test alert: ' + e);
       }
     }
 

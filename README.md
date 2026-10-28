@@ -111,6 +111,12 @@ flowchart TD
 - **Streaming Progress Bars**: Background asynchronous worker downloading GGUF layers with real-time percentage, MB/s throughput, and size telemetry.
 - **Instant Model Deletion & Purging**: Free up VRAM and NVMe storage in one click.
 
+### 5. 📱 Telegram Two-Way Agent Swarm Bridge (Target: 908-845-3667)
+- **Direct Mobile Commander Link**: Connects all company agents (CEO Atlas, CTO Vega, Hermes GPU Swarm) directly to your Telegram at `908-845-3667`.
+- **Outbound Deliverables**: Finished ticket outputs, execution stats, and synthesized skills are pushed directly to your Telegram chat.
+- **Inbound Task Dispatch**: Send any task or message to your Telegram bot; Paperclip ingests it, delegates it to the appropriate specialist agent (or CTO), executes it via local Ollama / Hermes GPU swarm, and returns the finished deliverable directly to your chat.
+- **Bot Commands**: `/status`, `/agents`, `/nodes`, `/hire <role>`.
+
 ---
 
 ## 🗺️ Network & Service Endpoints
@@ -218,6 +224,9 @@ sudo systemctl status hermes-agent
 | `GET` | `/api/ollama/library` | Fetches popular models from `ollama.com/library?sort=popular`. |
 | `POST` | `/api/ollama/pull` | Triggers background streaming model download. |
 | `GET` | `/download/paperclip-hermes-suite.zip` | Streams compressed standalone deployment bundle. |
+| `GET` | `/api/telegram` | Returns live status of Telegram bot bridge and phone pairing. |
+| `POST` | `/api/telegram/config` | Saves Bot Token, Chat ID, and phone number (908-845-3667). |
+| `POST` | `/api/telegram/test` | Sends live verification test alert from agents to Telegram. |
 
 ---
 

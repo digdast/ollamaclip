@@ -216,6 +216,17 @@ def default_state() -> Dict[str, Any]:
                 "level": "SUCCESS",
             },
         ],
+        "telegram": {
+            "enabled": True,
+            "bot_token": os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+            "chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
+            "target_phone": "908-845-3667",
+            "bot_username": os.environ.get("TELEGRAM_BOT_USERNAME", ""),
+            "notify_on_ticket_completed": True,
+            "notify_on_hire": True,
+            "status": "CONFIGURED",
+            "last_message": None,
+        },
     }
 
 
@@ -224,6 +235,29 @@ def load_state() -> Dict[str, Any]:
         try:
             with open(STATE_FILE, "r", encoding="utf-8") as f:
                 st = json.load(f)
+            
+            # Ensure telegram configuration exists
+            if "telegram" not in st:
+                st["telegram"] = {
+                    "enabled": True,
+                    "bot_token": os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+                    "chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
+                    "target_phone": "908-845-3667",
+                    "bot_username": os.environ.get("TELEGRAM_BOT_USERNAME", ""),
+                    "notify_on_ticket_completed": True,
+                    "notify_on_hire": True,
+                    "status": "CONFIGURED",
+                    "last_message": None,
+                }
+            else:
+                st["telegram"].setdefault("target_phone", "908-845-3667")
+                st["telegram"].setdefault("enabled", True)
+                st["telegram"].setdefault("notify_on_ticket_completed", True)
+                st["telegram"].setdefault("notify_on_hire", True)
+                if not st["telegram"].get("bot_token") and os.environ.get("TELEGRAM_BOT_TOKEN"):
+                    st["telegram"]["bot_token"] = os.environ.get("TELEGRAM_BOT_TOKEN")
+                if not st["telegram"].get("chat_id") and os.environ.get("TELEGRAM_CHAT_ID"):
+                    st["telegram"]["chat_id"] = os.environ.get("TELEGRAM_CHAT_ID")
             
             # Ensure hermes-host-17 is in hermes_nodes
             node_ids = {n.get("node_id") for n in st.get("hermes_nodes", [])}
@@ -549,6 +583,76 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     return {"ticket": ticket, "state": state}
 
 
+# --- TELEGRAM AGENT SWARM NOTIFICATION CORE ---
+def get_telegram_config(state: Dict[str, Any]) -> Dict[str, Any]:
+    tg = state.get("telegram")
+    if not isinstance(tg, dict):
+        tg = {}
+    return {
+        "enabled": tg.get("enabled", True),
+        "bot_token": tg.get("bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+        "chat_id": tg.get("chat_id") or os.environ.get("TELEGRAM_CHAT_ID", ""),
+        "target_phone": tg.get("target_phone", "908-845-3667"),
+        "bot_username": tg.get("bot_username", ""),
+        "notify_on_ticket_completed": tg.get("notify_on_ticket_completed", True),
+        "notify_on_hire": tg.get("notify_on_hire", True),
+        "status": tg.get("status", "CONFIGURED"),
+    }
+
+
+def send_telegram_raw(bot_token: str, chat_id: str, text: str) -> bool:
+    if not bot_token or not chat_id:
+        return False
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    chunks = []
+    rem = text
+    while len(rem) > 3900:
+        split_idx = rem.rfind("\n", 0, 3900)
+        if split_idx == -1 or split_idx < 1000:
+            split_idx = 3900
+        chunks.append(rem[:split_idx])
+        rem = rem[split_idx:].lstrip()
+    if rem:
+        chunks.append(rem)
+
+    ok = True
+    for c in chunks:
+        payload = json.dumps({
+            "chat_id": chat_id,
+            "text": c,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                pass
+        except Exception:
+            try:
+                payload = json.dumps({"chat_id": chat_id, "text": c}).encode("utf-8")
+                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    pass
+            except Exception:
+                ok = False
+    return ok
+
+
+def telegram_notify_sync(text: str) -> bool:
+    try:
+        st = load_state()
+        tg = get_telegram_config(st)
+        if not tg.get("enabled"):
+            return False
+        return send_telegram_raw(tg.get("bot_token"), tg.get("chat_id"), text)
+    except Exception:
+        return False
+
+
+async def telegram_notify_async(text: str):
+    await asyncio.to_thread(telegram_notify_sync, text)
+
+
 def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) -> Optional[str]:
     """Allows CTO (Vega) and Executive agents to autonomously hire/spawn agents and delegate tasks."""
     title = ticket.get("title", "").strip()
@@ -613,6 +717,19 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
                 }
                 state["agents"].append(new_ag)
                 add_audit(state, "Vega (CTO)", f"Hired & registered new employee '{name}' ({role}) -> Adapter: {adapter}, Model: {model}", "SUCCESS")
+                try:
+                    tg = get_telegram_config(state)
+                    if tg.get("enabled") and tg.get("notify_on_hire") and tg.get("bot_token") and tg.get("chat_id"):
+                        tg_msg = (
+                            f"🧠 <b>CTO Vega Dispatched New Specialist!</b>\n"
+                            f"<b>Name:</b> {avatar} {name} ({role})\n"
+                            f"<b>Department:</b> {dept} | <b>Manager:</b> Vega (CTO)\n"
+                            f"<b>Model:</b> <code>{model}</code> ({adapter})\n"
+                            f"📱 <b>Target Phone:</b> <code>{tg.get('target_phone')}</code>"
+                        )
+                        asyncio.create_task(telegram_notify_async(tg_msg))
+                except Exception:
+                    pass
                 actions.append(
                     f"✅ **CTO Action: Agent Hired & Onboarded into Sovereign AI Corp**\n"
                     f"- **Employee Name**: `{name}` ({avatar})\n"
@@ -757,6 +874,21 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                     "SUCCESS",
                 )
                 save_state(state)
+                try:
+                    tg = get_telegram_config(state)
+                    if tg.get("enabled") and tg.get("notify_on_ticket_completed") and tg.get("bot_token") and tg.get("chat_id"):
+                        tg_msg = (
+                            f"📎 <b>Ticket Deliverable Ready: {ticket_id}</b>\n"
+                            f"<b>Title:</b> {html.escape(ticket['title'])}\n"
+                            f"<b>Agent:</b> {agent.get('avatar', '🪽')} {html.escape(agent['name'])} ({html.escape(agent['role'])})\n"
+                            f"<b>Node:</b> <code>{matched_node_id}</code> | <b>Model:</b> <code>{ticket.get('model_used')}</code>\n"
+                            f"<b>Learned Skill:</b> <code>{c_log.get('learned_skill', 'autonomous-ops')}</code>\n"
+                            f"<b>Speed:</b> {ticket.get('tokens')} tokens in {ticket.get('duration_ms')} ms\n\n"
+                            f"<b>Deliverable Preview:</b>\n<pre>{html.escape(ticket.get('output', '')[:2800])}</pre>"
+                        )
+                        asyncio.create_task(telegram_notify_async(tg_msg))
+                except Exception:
+                    pass
                 return {"ticket": ticket, "state": state}
             except Exception:
                 continue
@@ -797,6 +929,19 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
             "SUCCESS",
         )
         save_state(state)
+        try:
+            tg = get_telegram_config(state)
+            if tg.get("enabled") and tg.get("notify_on_ticket_completed") and tg.get("bot_token") and tg.get("chat_id"):
+                tg_msg = (
+                    f"📎 <b>Ticket Deliverable Ready: {ticket_id}</b>\n"
+                    f"<b>Title:</b> {html.escape(ticket['title'])}\n"
+                    f"<b>Agent:</b> {agent.get('avatar', '🤖')} {html.escape(agent['name'])} ({html.escape(agent['role'])})\n"
+                    f"<b>Model:</b> <code>{ticket.get('model_used')}</code> | <b>Tokens:</b> {ticket.get('tokens')} ({ticket.get('duration_ms')} ms)\n\n"
+                    f"<b>Deliverable Preview:</b>\n<pre>{html.escape(ticket.get('output', '')[:2800])}</pre>"
+                )
+                asyncio.create_task(telegram_notify_async(tg_msg))
+        except Exception:
+            pass
     except Exception as exc:
         state = load_state()
         ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
@@ -1016,6 +1161,308 @@ async def unregister_hermes_node(node_id: str):
     add_audit(state, "Control Plane", f"Unregistered agent node '{target['name']}' ({target['endpoint']})", "WARN")
     save_state(state)
     return {"ok": True, "removed": node_id, "state": state}
+
+
+# --- TELEGRAM BOT TWO-WAY COMMUNICATION BRIDGE ---
+TELEGRAM_POLLING_RUNNING: bool = False
+TELEGRAM_LAST_UPDATE_OFFSET: int = 0
+TELEGRAM_POLL_THREAD: Optional[threading.Thread] = None
+
+
+def telegram_polling_worker():
+    global TELEGRAM_LAST_UPDATE_OFFSET, TELEGRAM_POLLING_RUNNING
+    TELEGRAM_POLLING_RUNNING = True
+    while TELEGRAM_POLLING_RUNNING:
+        try:
+            st = load_state()
+            tg = get_telegram_config(st)
+            token = tg.get("bot_token")
+            if not token or not tg.get("enabled"):
+                time.sleep(4)
+                continue
+
+            url = f"https://api.telegram.org/bot{token}/getUpdates?offset={TELEGRAM_LAST_UPDATE_OFFSET + 1}&timeout=15"
+            req = urllib.request.Request(url, headers={"User-Agent": "Paperclip-Ollama-Telegram/1.0"})
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            if not data.get("ok"):
+                time.sleep(4)
+                continue
+
+            for upd in data.get("result", []):
+                TELEGRAM_LAST_UPDATE_OFFSET = max(TELEGRAM_LAST_UPDATE_OFFSET, upd.get("update_id", 0))
+                msg = upd.get("message") or upd.get("channel_post")
+                if not msg:
+                    continue
+
+                chat = msg.get("chat", {})
+                chat_id = str(chat.get("id"))
+                sender = msg.get("from", {})
+                first_name = sender.get("first_name") or sender.get("username") or "Commander"
+                raw_text = (msg.get("text") or "").strip()
+
+                # Automatically bind chat_id on first contact
+                if st.get("telegram", {}).get("chat_id") != chat_id:
+                    st.setdefault("telegram", {})["chat_id"] = chat_id
+                    st["telegram"]["status"] = "CONNECTED"
+                    st["telegram"]["last_paired_user"] = first_name
+                    save_state(st)
+                    add_audit(st, "Telegram", f"Paired Telegram bot with {first_name} (Chat ID: {chat_id}, Phone: {tg.get('target_phone')})", "SUCCESS")
+                    save_state(st)
+
+                if not raw_text:
+                    continue
+
+                if raw_text == "/start" or raw_text.startswith("/start"):
+                    welcome = (
+                        f"👋 <b>Welcome to Sovereign AI Corp, {html.escape(first_name)}!</b>\n\n"
+                        f"Your Telegram account (<code>{tg.get('target_phone')}</code>) is now paired with the <b>Paperclip-Ollama Control Plane</b> and <b>Hermes Agent Swarm</b>.\n\n"
+                        f"<b>⚡ Available Commands:</b>\n"
+                        f"• <code>/status</code> — Cluster, Ollama &amp; active agent nodes\n"
+                        f"• <code>/agents</code> — List active agents and their assigned LLMs\n"
+                        f"• <code>/nodes</code> — View registered Hermes workers (Host 17 &amp; K3s)\n"
+                        f"• <code>/hire &lt;role&gt;</code> — Instruct CTO Vega to hire a new specialist\n\n"
+                        f"💬 <b>Direct Task Execution:</b>\n"
+                        f"Simply reply with any engineering objective, coding request, or infrastructure task (e.g. <i>'Check NVMe IOPS on Host 17'</i> or <i>'Write a K3s pod health check script'</i>). Your agents will execute it via local Ollama and return deliverables directly here."
+                    )
+                    send_telegram_raw(token, chat_id, welcome)
+
+                elif raw_text == "/status" or raw_text.startswith("/status"):
+                    st = load_state()
+                    active_nid = st.get("active_hermes_node_id")
+                    act_node = next((n for n in st.get("hermes_nodes", []) if n["node_id"] == active_nid), None)
+                    node_str = f"{act_node['name']} ({act_node['endpoint']})" if act_node else "Default"
+                    txt = (
+                        f"📊 <b>Sovereign AI Corp Swarm Status</b>\n\n"
+                        f"🏢 <b>Company:</b> {html.escape(st.get('company_name', 'Sovereign AI Corp'))}\n"
+                        f"🦙 <b>Ollama Backend:</b> <code>{st.get('ollama_url')}</code>\n"
+                        f"🪽 <b>Active Agent Node:</b> <code>{node_str}</code>\n"
+                        f"🤖 <b>Total Agents:</b> {len(st.get('agents', []))}\n"
+                        f"📋 <b>Total Tickets:</b> {len(st.get('tickets', []))}\n"
+                        f"📜 <b>Hermes Vault Skills:</b> {len(st.get('hermes_ticket_logs', []))}\n"
+                        f"📱 <b>Paired Phone:</b> <code>{tg.get('target_phone')}</code>"
+                    )
+                    send_telegram_raw(token, chat_id, txt)
+
+                elif raw_text == "/agents" or raw_text.startswith("/agents"):
+                    st = load_state()
+                    agent_lines = []
+                    for a in st.get("agents", []):
+                        agent_lines.append(
+                            f"{a.get('avatar', '🤖')} <b>{html.escape(a.get('name'))}</b> ({html.escape(a.get('role'))})\n"
+                            f"   └ Model: <code>{a.get('model')}</code> | Dept: {a.get('department')} | Status: {a.get('status')}"
+                        )
+                    txt = "👥 <b>Active AI Company Agents:</b>\n\n" + "\n\n".join(agent_lines)
+                    send_telegram_raw(token, chat_id, txt)
+
+                elif raw_text == "/nodes" or raw_text.startswith("/nodes"):
+                    st = load_state()
+                    active_nid = st.get("active_hermes_node_id")
+                    node_lines = []
+                    for n in st.get("hermes_nodes", []):
+                        is_act = n.get("node_id") == active_nid
+                        node_lines.append(
+                            f"{'🟢' if is_act else '⚪'} <b>{html.escape(n.get('name'))}</b> ({'ACTIVE' if is_act else 'STANDBY'})\n"
+                            f"   └ Endpoint: <code>{n.get('endpoint')}</code>\n"
+                            f"   └ Model: <code>{n.get('model')}</code> | Skills: {n.get('skills_count')}"
+                        )
+                    txt = "🪽 <b>Hermes Autonomous Worker Nodes:</b>\n\n" + "\n\n".join(node_lines)
+                    send_telegram_raw(token, chat_id, txt)
+
+                else:
+                    # User dispatched an instruction / ticket via Telegram!
+                    st = load_state()
+                    t_low = raw_text.lower()
+                    assigned_agent = "agent-hermes-17"
+                    if "hire" in t_low or raw_text.startswith("/hire") or "cto" in t_low:
+                        assigned_agent = "agent-cto"
+                    elif "ceo" in t_low or "strategy" in t_low or "roadmap" in t_low:
+                        assigned_agent = "agent-ceo"
+                    elif "security" in t_low or "audit" in t_low:
+                        sec_ag = next((a for a in st.get("agents", []) if "sec" in a["id"] or "aegis" in a["name"].lower()), None)
+                        if sec_ag:
+                            assigned_agent = sec_ag["id"]
+
+                    ag_obj = next((a for a in st.get("agents", []) if a["id"] == assigned_agent), st["agents"][0])
+
+                    send_telegram_raw(
+                        token,
+                        chat_id,
+                        f"⏳ <b>Task Ingested via Telegram</b>\n"
+                        f"<b>Assigned to:</b> {ag_obj.get('avatar')} {ag_obj.get('name')} ({ag_obj.get('model')})\n"
+                        f"<b>Prompt:</b> <i>{html.escape(raw_text[:200])}...</i>\n\n"
+                        f"Executing via local Ollama &amp; Hermes GPU node..."
+                    )
+
+                    def _run_ticket_sync():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            tck_id = f"TCK-{101 + len(st['tickets'])}"
+                            ticket = {
+                                "id": tck_id,
+                                "title": raw_text[:80].replace("\n", " ").strip(),
+                                "description": raw_text,
+                                "assigned_to": ag_obj["id"],
+                                "priority": "HIGH",
+                                "status": "IN_PROGRESS",
+                                "requires_approval": False,
+                                "approved": True,
+                                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "model_used": ag_obj["model"],
+                                "tokens": 0,
+                                "duration_ms": 0,
+                                "output": "Executing via Telegram trigger...",
+                            }
+                            st_cur = load_state()
+                            st_cur["tickets"].insert(0, ticket)
+                            add_audit(st_cur, f"Telegram ({first_name})", f"Dispatched {tck_id} assigned to {ag_obj['name']}", "INFO")
+                            save_state(st_cur)
+
+                            res = loop.run_until_complete(execute_ticket_internal(tck_id))
+                            t_done = res.get("ticket", ticket)
+                            out_text = t_done.get("output", "")
+                            
+                            deliverable_msg = (
+                                f"✅ <b>Deliverable Ready: {tck_id}</b>\n"
+                                f"<b>Objective:</b> {html.escape(t_done.get('title', ''))}\n"
+                                f"<b>Agent:</b> {ag_obj.get('avatar')} {ag_obj.get('name')} (<code>{t_done.get('model_used')}</code>)\n"
+                                f"<b>Speed:</b> {t_done.get('tokens')} tokens in {t_done.get('duration_ms')} ms\n\n"
+                                f"<b>Deliverable:</b>\n<pre>{html.escape(out_text)}</pre>"
+                            )
+                            send_telegram_raw(token, chat_id, deliverable_msg)
+                        except Exception as exc:
+                            send_telegram_raw(token, chat_id, f"❌ <b>Execution Error:</b> {html.escape(str(exc))}")
+                        finally:
+                            loop.close()
+
+                    threading.Thread(target=_run_ticket_sync, daemon=True).start()
+
+        except Exception:
+            time.sleep(3)
+
+
+def start_telegram_worker_if_needed():
+    global TELEGRAM_POLL_THREAD
+    if TELEGRAM_POLL_THREAD is None or not TELEGRAM_POLL_THREAD.is_alive():
+        TELEGRAM_POLL_THREAD = threading.Thread(target=telegram_polling_worker, daemon=True)
+        TELEGRAM_POLL_THREAD.start()
+
+
+@app.get("/api/telegram")
+async def get_telegram_status():
+    state = load_state()
+    tg = get_telegram_config(state)
+    bot_info = None
+    if tg.get("bot_token"):
+        try:
+            def _check():
+                u = f"https://api.telegram.org/bot{tg['bot_token']}/getMe"
+                req = urllib.request.Request(u, headers={"User-Agent": "Paperclip-Probe/1.0"})
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    return json.loads(r.read().decode())
+            res = await asyncio.to_thread(_check)
+            if res.get("ok"):
+                bot_info = res.get("result", {})
+                tg["bot_username"] = bot_info.get("username", "")
+                tg["status"] = "CONNECTED" if tg.get("chat_id") else "ONLINE_WAITING_FOR_USER"
+        except Exception as e:
+            tg["status"] = f"ERROR: {e}"
+
+    masked_token = (tg["bot_token"][:6] + "..." + tg["bot_token"][-4:]) if len(tg.get("bot_token", "")) > 10 else ""
+    return {
+        "ok": True,
+        "telegram": {
+            "enabled": tg.get("enabled", True),
+            "target_phone": tg.get("target_phone", "908-845-3667"),
+            "bot_token_masked": masked_token,
+            "has_token": bool(tg.get("bot_token")),
+            "chat_id": tg.get("chat_id"),
+            "has_chat_id": bool(tg.get("chat_id")),
+            "bot_username": tg.get("bot_username", ""),
+            "bot_info": bot_info,
+            "status": tg["status"],
+            "notify_on_ticket_completed": tg.get("notify_on_ticket_completed", True),
+            "notify_on_hire": tg.get("notify_on_hire", True),
+        }
+    }
+
+
+@app.post("/api/telegram/config")
+async def update_telegram_config(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    tg = state.setdefault("telegram", {})
+
+    token = payload.get("bot_token", "").strip()
+    if token:
+        try:
+            def _validate():
+                u = f"https://api.telegram.org/bot{token}/getMe"
+                req = urllib.request.Request(u, headers={"User-Agent": "Paperclip-Validate/1.0"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    return json.loads(r.read().decode())
+            val_res = await asyncio.to_thread(_validate)
+            if not val_res.get("ok"):
+                raise HTTPException(status_code=400, detail="Invalid Telegram Bot Token. Verify token with @BotFather.")
+            bot_info = val_res.get("result", {})
+            tg["bot_token"] = token
+            tg["bot_username"] = bot_info.get("username", "")
+            tg["status"] = "CONNECTED" if tg.get("chat_id") else "ONLINE_WAITING_FOR_USER"
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to verify Bot Token with Telegram API: {exc}")
+
+    if "chat_id" in payload:
+        tg["chat_id"] = str(payload.get("chat_id", "")).strip()
+    if "target_phone" in payload:
+        tg["target_phone"] = payload.get("target_phone", "908-845-3667").strip()
+    if "enabled" in payload:
+        tg["enabled"] = bool(payload.get("enabled", True))
+    if "notify_on_ticket_completed" in payload:
+        tg["notify_on_ticket_completed"] = bool(payload.get("notify_on_ticket_completed", True))
+    if "notify_on_hire" in payload:
+        tg["notify_on_hire"] = bool(payload.get("notify_on_hire", True))
+
+    save_state(state)
+    add_audit(state, "Telegram", f"Updated Telegram integration settings (Phone: {tg.get('target_phone')}, Bot: @{tg.get('bot_username')})", "INFO")
+    save_state(state)
+    start_telegram_worker_if_needed()
+    return {"ok": True, "telegram": tg, "state": state}
+
+
+@app.post("/api/telegram/test")
+async def send_telegram_test():
+    state = load_state()
+    tg = get_telegram_config(state)
+    token = tg.get("bot_token")
+    chat_id = tg.get("chat_id")
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Telegram Bot Token is not configured yet. Create a bot with @BotFather and save the token.")
+    if not chat_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bot Token is active (@{tg.get('bot_username')}), but your chat is not paired yet! Open your bot on Telegram from phone {tg.get('target_phone')} and send '/start' to pair automatically."
+        )
+
+    test_msg = (
+        f"⚡ <b>Sovereign AI Corp Communication Link Verified!</b>\n\n"
+        f"👑 <b>Atlas (CEO):</b> System link established with Telegram.\n"
+        f"🧠 <b>Vega (CTO):</b> Swarm routing online.\n"
+        f"🪽 <b>Hermes-17:</b> GPU worker on Host 17 ready to execute tickets.\n"
+        f"📱 <b>Target Phone:</b> <code>{tg.get('target_phone')}</code>\n\n"
+        f"All company agents are now connected and can talk directly to your Telegram. Send any task here to dispatch tickets immediately!"
+    )
+    ok = await asyncio.to_thread(send_telegram_raw, token, chat_id, test_msg)
+    if ok:
+        add_audit(state, "Telegram", f"Dispatched live test alert to Telegram chat {chat_id} ({tg.get('target_phone')})", "SUCCESS")
+        save_state(state)
+        return {"ok": True, "message": "Test alert successfully delivered to Telegram!", "chat_id": chat_id}
+    else:
+        raise HTTPException(status_code=502, detail="Failed to deliver message via Telegram Bot API. Verify bot has access to chat_id.")
 
 
 # --- OLLAMA HUB LIBRARY (https://ollama.com/library?sort=popular) & 1-CLICK MODEL DOWNLOADER ---
@@ -1400,6 +1847,11 @@ async def download_suite_bundle():
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=paperclip-hermes-ollama-suite.zip"},
     )
+
+
+@app.on_event("startup")
+async def app_startup_event():
+    start_telegram_worker_if_needed()
 
 
 if __name__ == "__main__":
