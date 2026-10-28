@@ -489,6 +489,7 @@
         <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
           value="http://192.168.0.17:11434" />
         <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
+        <button class="btn" style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);" onclick="openDispatchAgentStudio()">🤖 + Dispatch New Agent</button>
         <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
           Agent UI</a>
       </div>
@@ -511,6 +512,10 @@
           <button class="btn btn-primary" style="padding:12px 22px; font-size:14px;"
             onclick="switchTab('control', document.querySelectorAll('.tab-btn')[1])">
             🚀 Launch Paperclip Control Plane
+          </button>
+          <button class="btn" style="padding:12px 22px; font-size:14px; border-color:rgba(168,85,247,0.55); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
+            onclick="openDispatchAgentStudio()">
+            🤖 Dispatch New AI Agent
           </button>
           <a class="btn btn-emerald" style="padding:12px 22px; font-size:14px;"
             href="/download/paperclip-hermes-suite.zip">
@@ -571,7 +576,109 @@
     <section class="view-section" id="view-control">
       <div class="sec-hdr">
         <h2>🏢 AI Company Org Chart — Click Model Dropdown to Reassign Ollama Model</h2>
+        <button class="btn btn-primary" onclick="toggleAgentStudio()">🤖 + Dispatch / Spawn New AI Agent</button>
       </div>
+
+      <!-- DISPATCH / SPAWN NEW AI AGENT STUDIO -->
+      <div class="panel" id="dispatchAgentStudio" style="margin-bottom:22px; border-color:var(--border-glow); background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,27,75,0.65));">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <div>
+            <h3 style="font-size:16px; display:flex; align-items:center; gap:8px;">
+              <span>🤖 Dispatch & Spawn New Autonomous AI Agent</span>
+              <span class="badge" style="color:#c084fc; border-color:rgba(168,85,247,0.45);">Ollama + Hermes Ready</span>
+            </h3>
+            <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
+              Choose a 1-click specialist blueprint or customize a new AI employee connected to local Ollama (<code>192.168.0.17:11434</code>) or Hermes Bridge (<code>30792</code>).
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sre')">🛠️ K3s & DevOps SRE</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('research')">🔬 Deep Researcher</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('hermes')">🪽 Hermes Field Worker</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('db')">🗄️ Storage & DB Architect</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('ui')">🎨 Frontend & UI Engineer</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sec')">🛡️ Red-Team SecOps</button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-bottom:12px;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Agent Name / Callsign</label>
+            <input type="text" id="newAgentName" class="input-box" placeholder="e.g., Nexus, Nova, Hermes-02" value="Nexus" />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Role / Job Title</label>
+            <input type="text" id="newAgentRole" class="input-box" placeholder="e.g., Principal Kubernetes SRE" value="Principal Kubernetes & Infra SRE" />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Department</label>
+            <select id="newAgentDept" class="select-box">
+              <option value="Engineering" selected>Engineering</option>
+              <option value="Autonomous Ops">Autonomous Ops</option>
+              <option value="Architecture">Architecture</option>
+              <option value="Research">Research & AI</option>
+              <option value="Security & Governance">Security & Governance</option>
+              <option value="Product">Product & Design</option>
+              <option value="Executive">Executive</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Avatar Icon</label>
+            <select id="newAgentAvatar" class="select-box">
+              <option value="🛠️" selected>🛠️ DevOps / Wrench</option>
+              <option value="🤖">🤖 Autonomous Bot</option>
+              <option value="🪽">🪽 Hermes Wings</option>
+              <option value="🔬">🔬 Researcher</option>
+              <option value="⚡">⚡ High-Speed Executor</option>
+              <option value="🗄️">🗄️ Database / Storage</option>
+              <option value="🎨">🎨 Product / UI</option>
+              <option value="🛡️">🛡️ Security Shield</option>
+              <option value="🚀">🚀 Mission Launcher</option>
+              <option value="🧬">🧬 AI Scientist</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Execution Adapter</label>
+            <select id="newAgentAdapter" class="select-box">
+              <option value="ollama_native" selected>ollama_native (Direct Ollama 192.168.0.17)</option>
+              <option value="hermes_bridge">hermes_bridge (Hermes Self-Improving Worker)</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Assigned Ollama Model</label>
+            <select id="newAgentModel" class="select-box"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Reports To (Manager)</label>
+            <select id="newAgentReportsTo" class="select-box"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Token Budget</label>
+            <input type="number" id="newAgentBudget" class="input-box" value="1500000" step="100000" />
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Agent System Prompt / Persona Instructions</label>
+            <textarea id="newAgentPrompt" rows="3" placeholder="Define the agent's expertise, constraints, and output style...">You are Nexus, Principal Kubernetes & Infrastructure SRE at Sovereign AI Corp. Write production-ready K3s manifests, Proxmox automation scripts, and high-availability runbooks with zero placeholders.</textarea>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Optional Initial Mission / Task to Execute Immediately upon Dispatch</label>
+            <textarea id="newAgentInitialTask" rows="3" placeholder="(Optional) Enter an initial task here to immediately run a ticket with this newly dispatched agent via Ollama..."></textarea>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-emerald" id="spawnAgentOnlyBtn" onclick="dispatchNewAgent(false)">
+            ➕ Spawn Agent to Org Chart
+          </button>
+          <button class="btn btn-primary" id="spawnAndRunAgentBtn" onclick="dispatchNewAgent(true)">
+            🚀 Dispatch New Agent & Execute Initial Mission
+          </button>
+        </div>
+      </div>
+
       <div class="org-grid" id="orgChartGrid"></div>
 
       <div class="split-grid">
@@ -716,29 +823,62 @@
         ? ol.models.map(m => m.name)
         : ['qwen2.5-coder:7b', 'qwen3.5:latest', 'qwen3:4b-instruct', 'qwen2.5-coder:1.5b'];
 
+      // Populate New Agent Studio dropdowns
+      const newModelSel = document.getElementById('newAgentModel');
+      if (newModelSel) {
+        const prevModel = newModelSel.value;
+        newModelSel.innerHTML = modelNames.map(m => `<option value="${m}">${m}</option>`).join('');
+        if (prevModel && modelNames.includes(prevModel)) {
+          newModelSel.value = prevModel;
+        } else if (modelNames.includes('qwen2.5-coder:7b')) {
+          newModelSel.value = 'qwen2.5-coder:7b';
+        }
+      }
+      const newReportsSel = document.getElementById('newAgentReportsTo');
+      if (newReportsSel) {
+        const prevRep = newReportsSel.value;
+        newReportsSel.innerHTML = st.agents.map(a => `<option value="${a.id}">${a.avatar} ${a.name} (${a.role})</option>`).join('');
+        if (prevRep && st.agents.some(a => a.id === prevRep)) {
+          newReportsSel.value = prevRep;
+        } else if (st.agents.some(a => a.id === 'agent-cto')) {
+          newReportsSel.value = 'agent-cto';
+        }
+      }
+
       // Render Org Chart
       document.getElementById('orgChartGrid').innerHTML = st.agents.map(a => {
         const opts = modelNames.map(m => `<option value="${m}" ${m === a.model ? 'selected' : ''}>${m}</option>`).join('');
+        const mgr = st.agents.find(m => m.id === a.reports_to);
+        const mgrLabel = mgr ? `${mgr.avatar} ${mgr.name}` : 'Board';
         return `
           <div class="agent-card">
             <div class="agent-top">
               <div class="agent-identity">
                 <div class="avatar">${a.avatar}</div>
                 <div>
-                  <div class="agent-name">${a.name}</div>
-                  <div class="agent-role">${a.role}</div>
+                  <div class="agent-name">${escapeHtml(a.name)}</div>
+                  <div class="agent-role">${escapeHtml(a.role)}</div>
                 </div>
               </div>
               <span class="status-tag">${a.status}</span>
             </div>
             <div class="agent-meta">
-              Adapter: <strong>${a.adapter}</strong> • Tokens Used: <strong>${a.tokens_used.toLocaleString()}</strong>
+              <div>Dept: <strong>${escapeHtml(a.department || 'Engineering')}</strong> • Reports to: <strong>${escapeHtml(mgrLabel)}</strong></div>
+              <div style="margin-top:3px;">Adapter: <strong>${a.adapter}</strong> • Tokens: <strong>${(a.tokens_used || 0).toLocaleString()}</strong></div>
             </div>
-            <div class="field" style="margin-bottom:0;">
+            <div class="field" style="margin-bottom:10px;">
               <label>Assigned Ollama Model</label>
               <select class="select-box" onchange="changeAgentModel('${a.id}', this.value)">
                 ${opts}
               </select>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn btn-primary" style="flex:1; justify-content:center; padding:6px 10px; font-size:11.5px;" onclick="quickDispatchToAgent('${a.id}')">
+                ⚡ Dispatch Task
+              </button>
+              <button class="btn" style="padding:6px 10px; font-size:11.5px; color:#f87171;" title="Decommission Agent" onclick="deleteAgent('${a.id}', '${escapeHtml(a.name)}')">
+                🗑️
+              </button>
             </div>
           </div>
         `;
@@ -857,6 +997,182 @@
         body: JSON.stringify({ model })
       });
       loadState();
+    }
+
+    const AGENT_PRESETS = {
+      sre: {
+        name: 'Nexus',
+        role: 'Principal Kubernetes & Infra SRE',
+        dept: 'Engineering',
+        avatar: '🛠️',
+        adapter: 'ollama_native',
+        model: 'qwen2.5-coder:7b',
+        prompt: 'You are Nexus, Principal Kubernetes & Infrastructure SRE at Sovereign AI Corp. Write production-ready K3s manifests, Proxmox automation scripts, and high-availability runbooks with zero placeholders.'
+      },
+      research: {
+        name: 'Oracle',
+        role: 'Principal AI & Systems Researcher',
+        dept: 'Research',
+        avatar: '🔬',
+        adapter: 'ollama_native',
+        model: 'qwen3.5:latest',
+        prompt: 'You are Oracle, Principal AI & Distributed Systems Researcher. Perform deep first-principles technical analysis, benchmark comparisons, and architectural trade-off evaluations.'
+      },
+      hermes: {
+        name: 'Hermes-02',
+        role: 'Autonomous Self-Improving Field Worker',
+        dept: 'Autonomous Ops',
+        avatar: '🪽',
+        adapter: 'hermes_bridge',
+        model: 'qwen2.5-coder:7b',
+        prompt: 'You are Hermes-02, an autonomous self-improving field agent linked via the Hermes Bridge. Execute tasks, extract reusable skills into the Skills Vault, and log episodic memories.'
+      },
+      db: {
+        name: 'Cipher',
+        role: 'Principal Storage & Database Architect',
+        dept: 'Architecture',
+        avatar: '🗄️',
+        adapter: 'ollama_native',
+        model: 'qwen2.5-coder:7b',
+        prompt: 'You are Cipher, Principal NVMe Storage, PostgreSQL, and SQLite High-IOPS Database Architect. Optimize queries, WAL durability, ZFS/Ceph/NFS storage tiers, and caching layers.'
+      },
+      ui: {
+        name: 'Pixel',
+        role: 'Staff Frontend & Design Systems Engineer',
+        dept: 'Product',
+        avatar: '🎨',
+        adapter: 'ollama_native',
+        model: 'qwen2.5-coder:7b',
+        prompt: 'You are Pixel, Staff Frontend & UI/UX Engineer. Build responsive, modern dark-glass web interfaces, dashboards, and interactive components with clean HTML, CSS, and TypeScript/JS.'
+      },
+      sec: {
+        name: 'Aegis',
+        role: 'Principal Red-Team & SecOps Officer',
+        dept: 'Security & Governance',
+        avatar: '🛡️',
+        adapter: 'ollama_native',
+        model: 'qwen3:4b-instruct',
+        prompt: 'You are Aegis, Principal Red-Team & SecOps Officer. Audit infrastructure, RBAC policies, network boundaries, and code deliverables for vulnerabilities and hardening opportunities.'
+      }
+    };
+
+    function openDispatchAgentStudio() {
+      switchTab('control', document.querySelectorAll('.tab-btn')[1]);
+      const studio = document.getElementById('dispatchAgentStudio');
+      if (studio) {
+        studio.style.display = 'block';
+        studio.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      document.getElementById('newAgentName')?.focus();
+    }
+
+    function toggleAgentStudio() {
+      const studio = document.getElementById('dispatchAgentStudio');
+      if (!studio) return;
+      studio.style.display = studio.style.display === 'none' ? 'block' : 'block';
+      studio.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('newAgentName')?.focus();
+    }
+
+    function applyAgentPreset(key) {
+      const p = AGENT_PRESETS[key];
+      if (!p) return;
+      document.getElementById('newAgentName').value = p.name;
+      document.getElementById('newAgentRole').value = p.role;
+      document.getElementById('newAgentDept').value = p.dept;
+      document.getElementById('newAgentAvatar').value = p.avatar;
+      document.getElementById('newAgentAdapter').value = p.adapter;
+      document.getElementById('newAgentPrompt').value = p.prompt;
+      const modelSel = document.getElementById('newAgentModel');
+      if (modelSel && Array.from(modelSel.options).some(o => o.value === p.model)) {
+        modelSel.value = p.model;
+      }
+    }
+
+    async function dispatchNewAgent(withInitialTask) {
+      const name = document.getElementById('newAgentName').value.trim();
+      const role = document.getElementById('newAgentRole').value.trim();
+      const department = document.getElementById('newAgentDept').value;
+      const avatar = document.getElementById('newAgentAvatar').value;
+      const adapter = document.getElementById('newAgentAdapter').value;
+      const model = document.getElementById('newAgentModel').value;
+      const reports_to = document.getElementById('newAgentReportsTo').value;
+      const budget_tokens = parseInt(document.getElementById('newAgentBudget').value || '1000000', 10);
+      const system_prompt = document.getElementById('newAgentPrompt').value.trim();
+      const initial_task = document.getElementById('newAgentInitialTask').value.trim();
+
+      if (!name || !role) {
+        alert('Please enter both an Agent Name and Role.');
+        return;
+      }
+      if (withInitialTask && !initial_task) {
+        alert('Please enter an Initial Mission / Task in the right-hand box, or click "➕ Spawn Agent to Org Chart".');
+        document.getElementById('newAgentInitialTask').focus();
+        return;
+      }
+
+      const btnSpawn = document.getElementById('spawnAgentOnlyBtn');
+      const btnRun = document.getElementById('spawnAndRunAgentBtn');
+      btnSpawn.disabled = true;
+      btnRun.disabled = true;
+      const origText = btnRun.textContent;
+      if (withInitialTask) {
+        btnRun.textContent = `⏳ Spawning ${name} & Executing Mission via Ollama...`;
+      } else {
+        btnSpawn.textContent = `⏳ Spawning ${name}...`;
+      }
+
+      try {
+        const res = await fetch('/api/agents/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            role,
+            department,
+            avatar,
+            adapter,
+            model,
+            reports_to,
+            budget_tokens,
+            system_prompt,
+            initial_task: withInitialTask ? initial_task : '',
+            auto_execute: true
+          })
+        });
+        const data = await res.json();
+        document.getElementById('newAgentInitialTask').value = '';
+        await loadState();
+        if (data.agent && document.getElementById('tckAgent')) {
+          document.getElementById('tckAgent').value = data.agent.id;
+        }
+      } finally {
+        btnSpawn.disabled = false;
+        btnRun.disabled = false;
+        btnSpawn.textContent = '➕ Spawn Agent to Org Chart';
+        btnRun.textContent = origText;
+      }
+    }
+
+    function quickDispatchToAgent(agentId) {
+      const sel = document.getElementById('tckAgent');
+      if (sel) sel.value = agentId;
+      const titleInp = document.getElementById('tckTitle');
+      if (titleInp) {
+        titleInp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        titleInp.focus();
+      }
+    }
+
+    async function deleteAgent(agentId, agentName) {
+      if (!confirm(`Decommission agent '${agentName}' from the AI Org Chart?`)) return;
+      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Could not remove agent');
+        return;
+      }
+      await loadState();
     }
 
     async function createTicket() {

@@ -348,21 +348,22 @@ async def connect_ollama(payload: Dict[str, Any] = Body(...)):
 
 
 @app.post("/api/agents")
+@app.post("/api/agents/dispatch")
 async def save_agent(payload: Dict[str, Any] = Body(...)):
     state = load_state()
     agent_id = payload.get("id") or f"agent-{str(uuid.uuid4())[:6]}"
     new_agent = {
         "id": agent_id,
-        "name": payload.get("name", "New Agent"),
-        "role": payload.get("role", "Autonomous Specialist"),
-        "department": payload.get("department", "Engineering"),
+        "name": (payload.get("name") or "New Agent").strip(),
+        "role": (payload.get("role") or "Autonomous Specialist").strip(),
+        "department": (payload.get("department") or "Engineering").strip(),
         "reports_to": payload.get("reports_to") or "agent-cto",
-        "adapter": payload.get("adapter", "ollama_native"),
-        "model": payload.get("model", "qwen2.5-coder:7b"),
-        "status": "IDLE",
-        "budget_tokens": int(payload.get("budget_tokens", 500000)),
+        "adapter": payload.get("adapter") or "ollama_native",
+        "model": payload.get("model") or "qwen2.5-coder:7b",
+        "status": "ONLINE" if payload.get("adapter") == "hermes_bridge" else "IDLE",
+        "budget_tokens": int(payload.get("budget_tokens", 1000000)),
         "tokens_used": int(payload.get("tokens_used", 0)),
-        "avatar": payload.get("avatar", "🤖"),
+        "avatar": payload.get("avatar") or "🤖",
         "system_prompt": payload.get(
             "system_prompt",
             "You are an autonomous specialist agent in Sovereign AI Corp powered by local Ollama.",
@@ -378,9 +379,46 @@ async def save_agent(payload: Dict[str, Any] = Body(...)):
     if not replaced:
         state["agents"].append(new_agent)
 
-    add_audit(state, new_agent["name"], f"Configured agent '{new_agent['name']}' ({new_agent['role']}) -> Model: {new_agent['model']}", "INFO")
+    action_word = "Updated" if replaced else "Dispatched new"
+    add_audit(
+        state,
+        new_agent["name"],
+        f"{action_word} agent '{new_agent['name']}' ({new_agent['role']}, dept: {new_agent['department']}, adapter: {new_agent['adapter']}) -> Model: {new_agent['model']}",
+        "SUCCESS",
+    )
     save_state(state)
-    return {"agent": new_agent, "state": state}
+
+    # If an initial mission / task was supplied when dispatching the agent, create & execute the ticket automatically
+    initial_task = (payload.get("initial_task") or "").strip()
+    dispatched_ticket = None
+    if initial_task:
+        tck_res = await create_and_run_ticket(
+            {
+                "title": payload.get("initial_task_title") or f"Initial Mission for {new_agent['name']}: {initial_task[:64]}",
+                "description": initial_task,
+                "assigned_to": new_agent["id"],
+                "priority": payload.get("priority", "HIGH"),
+                "auto_execute": bool(payload.get("auto_execute", True)),
+            }
+        )
+        dispatched_ticket = tck_res.get("ticket")
+        state = tck_res.get("state", load_state())
+
+    return {"ok": True, "agent": new_agent, "ticket": dispatched_ticket, "state": state}
+
+
+@app.delete("/api/agents/{agent_id}")
+async def delete_agent(agent_id: str):
+    state = load_state()
+    target = next((a for a in state["agents"] if a["id"] == agent_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if len(state["agents"]) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot remove the last remaining agent in the company")
+    state["agents"] = [a for a in state["agents"] if a["id"] != agent_id]
+    add_audit(state, "Admin", f"Decommissioned agent '{target['name']}' ({target['role']})", "WARN")
+    save_state(state)
+    return {"ok": True, "removed": agent_id, "state": state}
 
 
 @app.post("/api/agents/{agent_id}/model")
@@ -588,9 +626,13 @@ async def register_hermes_node(payload: Dict[str, Any] = Body(...)):
 @app.get("/api/hermes/tasks")
 async def get_hermes_queued_tasks():
     state = load_state()
+    hermes_agent_ids = {
+        a["id"] for a in state["agents"]
+        if a.get("adapter") == "hermes_bridge" or a["id"] == "agent-hermes"
+    }
     queued = [
         t for t in state["tickets"]
-        if t["assigned_to"] == "agent-hermes" and t["status"] == "QUEUED"
+        if t["assigned_to"] in hermes_agent_ids and t["status"] == "QUEUED"
     ]
     return {"tasks": queued, "ollama_url": state["ollama_url"]}
 
