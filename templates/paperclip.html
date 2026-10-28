@@ -462,7 +462,8 @@
       <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
       <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
       <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
-      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678) ↗</button>
+      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678)
+        ↗</button>
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
@@ -537,7 +538,8 @@
             target="_blank">
             🪽 Launch Hermes Agent Console
           </a>
-          <a class="btn" style="padding:12px 22px; font-size:14px; border-color:rgba(245,158,11,0.5); background:linear-gradient(135deg,#d97706,#b45309);"
+          <a class="btn"
+            style="padding:12px 22px; font-size:14px; border-color:rgba(245,158,11,0.5); background:linear-gradient(135deg,#d97706,#b45309);"
             href="http://192.168.0.81:30678" target="_blank">
             ⚡ Open n8n Workflows
           </a>
@@ -593,9 +595,15 @@
       <div class="sec-hdr">
         <h2>🏢 AI Company Org Chart — Click Model Dropdown to Reassign Ollama Model</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn" style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);" onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
-          <button class="btn" style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);" onclick="toggleAgentStudio()">🤖 + Dispatch Agent</button>
-          <button class="btn" style="border-color:rgba(245,158,11,0.5); background:rgba(245,158,11,0.15); color:#fbbf24;" onclick="askCtoToHire()">💼 Ask CTO to Hire</button>
+          <button class="btn"
+            style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
+            onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
+          <button class="btn"
+            style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
+            onclick="toggleAgentStudio()">🤖 + Dispatch Agent</button>
+          <button class="btn"
+            style="border-color:rgba(245,158,11,0.5); background:rgba(245,158,11,0.15); color:#fbbf24;"
+            onclick="askCtoToHire()">💼 Ask CTO to Hire</button>
         </div>
       </div>
 
@@ -804,8 +812,15 @@
     <section class="view-section" id="view-hermes">
       <div class="sec-hdr">
         <h2>🪽 Hermes Autonomous Self-Improving Worker Nodes</h2>
+        <button class="btn" style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);" onclick="openDispatchHermesWorker()">🪽 + Dispatch New Hermes Worker</button>
       </div>
       <div id="hermesNodesGrid" class="org-grid"></div>
+
+      <div class="sec-hdr" style="margin-top:28px;">
+        <h2>📜 Hermes Agent Ticket Completion Logs & Telemetry Stream</h2>
+        <button class="btn" onclick="loadState()">🔄 Refresh Logs</button>
+      </div>
+      <div id="hermesTicketLogsContainer" class="panel"></div>
     </section>
 
     <!-- VIEW 5: AUDIT LOGS -->
@@ -927,16 +942,51 @@
 
       // Render Tickets
       document.getElementById('ticketsContainer').innerHTML = st.tickets.map(t => {
-        const ag = st.agents.find(a => a.id === t.assigned_to) || { name: t.assigned_to, avatar: '🤖' };
+        const ag = st.agents.find(a => a.id === t.assigned_to) || { name: t.assigned_to, avatar: '🤖', adapter: 'ollama_native' };
         const approveBtn = (t.status === 'AWAITING_APPROVAL' || !t.approved)
           ? `<button class="btn btn-emerald" onclick="approveTicket('${t.id}')">✅ Approve & Merge</button>`
           : `<span class="badge" style="color:#34d399; border-color:#10b981;">✓ Governance Approved</span>`;
+        
+        let hermesLogBlock = '';
+        if (t.hermes_log || (ag.adapter === 'hermes_bridge' && t.output)) {
+          const hl = t.hermes_log || {};
+          const skillName = hl.learned_skill || 'autonomous-ops';
+          const tokSec = hl.tok_per_sec ? `${hl.tok_per_sec} tok/s` : '';
+          const stepsHtml = (hl.steps || []).map(s => `
+            <div style="display:flex; justify-content:space-between; gap:10px; padding:3px 0; border-bottom:1px dashed rgba(255,255,255,0.06); font-size:11px; font-family:monospace;">
+              <span><strong style="color:var(--cyan);">${escapeHtml(s.step)}</strong>: ${escapeHtml(s.detail)}</span>
+              <span style="color:var(--text-muted);">${escapeHtml(s.time)}</span>
+            </div>
+          `).join('');
+
+          hermesLogBlock = `
+            <div style="margin-top:10px; background:rgba(6,9,19,0.7); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:10px 12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                <span style="font-size:12px; font-weight:700; color:var(--cyan); display:flex; align-items:center; gap:6px;">
+                  <span>🪽 Hermes Completion Telemetry</span>
+                  <span class="badge" style="color:#a7f3d0; border-color:#059669;">Skill: ${escapeHtml(skillName)}</span>
+                </span>
+                <span style="font-size:11px; font-family:monospace; color:var(--text-sub);">
+                  ${tokSec ? tokSec + ' • ' : ''}${t.tokens} tokens (${t.duration_ms} ms)
+                </span>
+              </div>
+              ${hl.memory_summary ? `<div style="font-size:11.5px; color:var(--text-sub); margin-bottom:6px; font-style:italic;">"${escapeHtml(hl.memory_summary)}"</div>` : ''}
+              ${stepsHtml ? `
+                <details style="margin-top:4px;">
+                  <summary style="cursor:pointer; font-size:11px; color:var(--cyan); font-family:monospace;">📜 View Step-by-Step Execution Trace (${(hl.steps || []).length} steps)</summary>
+                  <div style="margin-top:6px; padding-left:4px;">${stepsHtml}</div>
+                </details>
+              ` : ''}
+            </div>
+          `;
+        }
+
         return `
           <div class="ticket-card">
             <div class="ticket-hdr">
               <div>
                 <span class="badge">${t.id}</span>
-                <strong style="font-size:14.5px; margin-left:6px;">${t.title}</strong>
+                <strong style="font-size:14.5px; margin-left:6px;">${escapeHtml(t.title)}</strong>
               </div>
               <div style="display:flex; gap:8px; align-items:center;">
                 <span class="badge">${t.status}</span>
@@ -944,10 +994,11 @@
               </div>
             </div>
             <div style="font-size:12px; color:var(--text-sub); margin-bottom:6px;">
-              Assigned to: <strong>${ag.avatar} ${ag.name}</strong> • Model: <code>${t.model_used}</code> •
+              Assigned to: <strong>${ag.avatar} ${escapeHtml(ag.name)}</strong> • Model: <code>${t.model_used}</code> •
               ${t.tokens} tokens (${t.duration_ms} ms) • ${t.updated_at}
             </div>
-            <div style="font-size:12.5px; color:var(--text-muted);">${t.description}</div>
+            <div style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(t.description)}</div>
+            ${hermesLogBlock}
             <div class="ticket-output">${escapeHtml(t.output || '')}</div>
           </div>
         `;
@@ -996,6 +1047,57 @@
           </a>
         </div>
       `).join('');
+
+      // Render Hermes Ticket Completion Logs & Telemetry
+      const hLogs = st.hermes_ticket_logs || [];
+      const logsBox = document.getElementById('hermesTicketLogsContainer');
+      if (logsBox) {
+        if (hLogs.length === 0) {
+          logsBox.innerHTML = '<div style="color:var(--text-sub); font-size:13px; text-align:center; padding:18px;">No Hermes tickets executed yet. Assign a ticket to a Hermes worker above to stream completion logs.</div>';
+        } else {
+          logsBox.innerHTML = hLogs.map(l => {
+            const stepsHtml = (l.steps || []).map(s => `
+              <div style="display:flex; justify-content:space-between; gap:10px; padding:3px 0; font-family:monospace; font-size:11.5px; border-bottom:1px dashed rgba(255,255,255,0.06);">
+                <span><strong style="color:var(--cyan);">${escapeHtml(s.step)}</strong>: ${escapeHtml(s.detail)}</span>
+                <span style="color:var(--text-muted);">${escapeHtml(s.time)}</span>
+              </div>
+            `).join('');
+
+            return `
+              <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="badge" style="color:#38bdf8; border-color:rgba(56,189,248,0.4);">${escapeHtml(l.ticket_id || 'TCK')}</span>
+                    <strong style="font-size:14px; color:var(--text-main);">${escapeHtml(l.title || 'Untitled Ticket')}</strong>
+                    <span class="badge" style="color:#a7f3d0; border-color:#059669;">🪽 ${escapeHtml(l.agent_name || 'Hermes-01')}</span>
+                  </div>
+                  <div style="display:flex; gap:6px; align-items:center; font-family:monospace; font-size:11px;">
+                    <span class="badge" style="color:#c084fc;">${escapeHtml(l.model || 'qwen2.5-coder')}</span>
+                    <span class="badge">${l.tokens || 0} tokens</span>
+                    <span class="badge">${l.duration_ms || 0} ms</span>
+                    <span class="badge" style="color:#34d399; border-color:#10b981;">✓ ${escapeHtml(l.status || 'SUCCESS')}</span>
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin-bottom:8px; color:var(--text-sub);">
+                  <div>Learned Skill: <strong style="color:#34d399;">${escapeHtml(l.learned_skill || 'autonomous-ops')}</strong></div>
+                  <div>Speed: <strong>${l.tok_per_sec || 0} tok/sec</strong></div>
+                  <div>Timestamp: <strong>${escapeHtml(l.completed_at || '')}</strong></div>
+                </div>
+
+                ${l.memory_summary ? `<div style="font-size:12px; color:var(--text-sub); margin-bottom:8px; font-style:italic; background:rgba(0,0,0,0.3); padding:6px 10px; border-radius:6px;">"${escapeHtml(l.memory_summary)}"</div>` : ''}
+
+                ${stepsHtml ? `
+                  <div style="margin-top:6px; background:#050811; border:1px solid var(--border); border-radius:8px; padding:10px;">
+                    <div style="font-size:11px; font-family:monospace; color:var(--text-sub); margin-bottom:6px; text-transform:uppercase;">Execution Timeline & Vault Extraction</div>
+                    ${stepsHtml}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+        }
+      }
 
       // Render Audit Logs
       document.getElementById('auditList').innerHTML = st.audit_logs.map(l => `
@@ -1127,7 +1229,7 @@
       const ctoId = cto ? cto.id : (appData?.state?.agents || [])[0]?.id;
       const tckAgent = document.getElementById('tckAgent');
       if (tckAgent && ctoId) tckAgent.value = ctoId;
-      
+
       const tckTitle = document.getElementById('tckTitle');
       const tckDesc = document.getElementById('tckDesc');
       if (tckTitle && tckDesc) {

@@ -363,12 +363,48 @@ async def execute_paperclip_ticket(payload: Dict[str, Any] = Body(...)):
     desc = payload.get("description", "")
     model = payload.get("model") or st["active_model"]
 
+    t0 = time.time()
+    steps = [
+        {"step": "Task Ingested", "time": "0.0s", "detail": f"Hermes Agent Bridge received ticket {t_id}: '{title}'"},
+    ]
+    skills_used = [s["name"] for s in st["skills"][:4]]
+    steps.append({"step": "Skills Vault Prime", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Primed context with {len(skills_used)} active skills: {', '.join(skills_used)}"})
+    steps.append({"step": "Episodic Memory Load", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Retrieved {len(st['memories'])} cross-session memory fragments"})
+
     full_prompt = f"[PAPERCLIP TICKET {t_id}] {title}\n\n{desc}"
+    steps.append({"step": "Ollama Inference Started", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Executing deep inference via {st['ollama_url']} (model: {model})"})
     res = await asyncio.to_thread(run_ollama_inference, st, full_prompt, model)
+    
+    elapsed_s = max(0.1, round(time.time() - t0, 2))
+    tok_sec = round(res['tokens'] / elapsed_s, 1)
+    steps.append({"step": "Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {res['tokens']} tokens ({tok_sec} tok/sec in {res['duration_ms']} ms)"})
 
     st = load_hermes_state()
     learned_skill = synthesize_skill_from_task(st, title, res["content"])
+    steps.append({"step": "Skill Synthesis", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Saved autonomous reusable skill '{learned_skill}' into persistent Skills Vault"})
+
+    memory_summary = f"Completed ticket {t_id} ('{title}') with {model} and synthesized '{learned_skill}'."
     st["tasks_completed"] = st.get("tasks_completed", 0) + 1
+    
+    completion_log = {
+        "id": f"hlog-{str(uuid.uuid4())[:8]}",
+        "ticket_id": t_id,
+        "title": title,
+        "agent_name": st["agent_name"],
+        "node_id": st["node_id"],
+        "model": res["model"],
+        "tokens": res["tokens"],
+        "tok_per_sec": tok_sec,
+        "duration_ms": res["duration_ms"],
+        "completed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "learned_skill": learned_skill,
+        "memory_summary": memory_summary,
+        "steps": steps,
+        "status": "SUCCESS",
+    }
+    st.setdefault("ticket_completion_logs", []).insert(0, completion_log)
+    st["ticket_completion_logs"] = st["ticket_completion_logs"][:50]
+
     st["chat_history"].append(
         {
             "id": f"tck-{str(uuid.uuid4())[:6]}",
@@ -390,7 +426,14 @@ async def execute_paperclip_ticket(payload: Dict[str, Any] = Body(...)):
         "duration_ms": res["duration_ms"],
         "model": res["model"],
         "learned_skill": learned_skill,
+        "completion_log": completion_log,
     }
+
+
+@app.get("/api/ticket_logs")
+async def get_hermes_ticket_logs():
+    st = load_hermes_state()
+    return {"logs": st.get("ticket_completion_logs", [])}
 
 
 @app.post("/api/skills")

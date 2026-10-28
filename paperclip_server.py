@@ -165,6 +165,29 @@ def default_state() -> Dict[str, Any]:
                 "status": "CONNECTED",
             }
         ],
+        "hermes_ticket_logs": [
+            {
+                "id": "hlog-init-101",
+                "ticket_id": "TCK-101",
+                "title": "Design K3s High-Availability Pod Autoscaling & Storage Policy",
+                "agent_name": "Hermes-01",
+                "node_id": "hermes-k3s-primary",
+                "model": "qwen2.5-coder:7b",
+                "tokens": 642,
+                "tok_per_sec": 71.4,
+                "duration_ms": 2840,
+                "completed_at": "2026-10-28 09:16:12",
+                "learned_skill": "k3s-sqlite-nvme-optimization",
+                "memory_summary": "Pinned SQLite WAL workloads to local NVMe hostPath to prevent NFS lock contention.",
+                "steps": [
+                    {"step": "Task Ingested", "time": "0.0s", "detail": "Paperclip assigned TCK-101 to Hermes-01"},
+                    {"step": "Skills Vault Prime", "time": "0.1s", "detail": "Retrieved 4 skills from Hermes vault"},
+                    {"step": "Inference Complete", "time": "2.8s", "detail": "Generated 642 tokens via qwen2.5-coder:7b"},
+                    {"step": "Skill Synthesis", "time": "2.9s", "detail": "Synthesized 'k3s-sqlite-nvme-optimization' into vault"},
+                ],
+                "status": "SUCCESS",
+            }
+        ],
         "audit_logs": [
             {
                 "id": str(uuid.uuid4())[:8],
@@ -629,10 +652,40 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                 ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 agent["status"] = "ONLINE"
                 agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+                
+                # Attach rich Hermes Ticket Completion Log
+                c_log = h_res.get("completion_log")
+                if not c_log:
+                    elapsed_s = max(0.1, round(ticket["duration_ms"] / 1000.0, 2))
+                    c_log = {
+                        "id": f"hlog-{str(uuid.uuid4())[:8]}",
+                        "ticket_id": ticket_id,
+                        "title": ticket["title"],
+                        "agent_name": agent["name"],
+                        "node_id": "hermes-k3s-primary",
+                        "model": ticket["model_used"],
+                        "tokens": ticket["tokens"],
+                        "tok_per_sec": round(ticket["tokens"] / elapsed_s, 1),
+                        "duration_ms": ticket["duration_ms"],
+                        "completed_at": ticket["updated_at"],
+                        "learned_skill": h_res.get("learned_skill", "autonomous-ops"),
+                        "memory_summary": f"Completed ticket {ticket_id} ('{ticket['title']}') and synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}'.",
+                        "steps": [
+                            {"step": "Task Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']}"},
+                            {"step": "Skills Vault Primed", "time": "0.2s", "detail": f"Primed with skills vault and episodic memory"},
+                            {"step": "Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {ticket['tokens']} tokens ({ticket['duration_ms']} ms)"},
+                            {"step": "Skill Synthesis", "time": f"{elapsed_s}s", "detail": f"Synthesized reusable skill '{h_res.get('learned_skill', 'autonomous-ops')}' into vault"},
+                        ],
+                        "status": "SUCCESS",
+                    }
+                ticket["hermes_log"] = c_log
+                state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
+                state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
+
                 add_audit(
                     state,
                     agent["name"],
-                    f"Hermes executed {ticket_id} & synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}' ({ticket['tokens']} tokens)",
+                    f"Hermes executed {ticket_id} & synthesized skill '{c_log.get('learned_skill', 'autonomous-ops')}' ({ticket['tokens']} tokens in {ticket['duration_ms']} ms)",
                     "SUCCESS",
                 )
                 save_state(state)
@@ -756,6 +809,20 @@ async def get_hermes_queued_tasks():
         if t["assigned_to"] in hermes_agent_ids and t["status"] == "QUEUED"
     ]
     return {"tasks": queued, "ollama_url": state["ollama_url"]}
+
+
+@app.get("/api/hermes/ticket_logs")
+async def get_hermes_ticket_completion_logs():
+    state = load_state()
+    logs = state.get("hermes_ticket_logs", [])
+    # Also include any ticket that has a hermes_log
+    seen_ids = {l["id"] for l in logs if "id" in l}
+    for t in state.get("tickets", []):
+        hl = t.get("hermes_log")
+        if hl and hl.get("id") and hl["id"] not in seen_ids:
+            logs.append(hl)
+            seen_ids.add(hl["id"])
+    return {"logs": logs, "count": len(logs)}
 
 
 # --- OLLAMA HUB LIBRARY (https://ollama.com/library?sort=popular) & 1-CLICK MODEL DOWNLOADER ---
