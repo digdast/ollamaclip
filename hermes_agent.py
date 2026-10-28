@@ -169,6 +169,7 @@ def sync_with_paperclip(st: Dict[str, Any]) -> Dict[str, Any]:
     try:
         payload = {
             "node_id": st["node_id"],
+            "agent_name": st["agent_name"],
             "name": f"{st['agent_name']} (Autonomous Worker)",
             "endpoint": st.get("self_url", DEFAULT_SELF_URL),
             "ollama_url": st["ollama_url"],
@@ -282,6 +283,128 @@ def run_ollama_inference(
     }
 
 
+ACTIVE_PROCESSING_TICKETS = set()
+
+
+async def process_claimed_ticket(ticket: Dict[str, Any]):
+    t_id = ticket.get("id")
+    if not t_id or t_id in ACTIVE_PROCESSING_TICKETS:
+        return
+    ACTIVE_PROCESSING_TICKETS.add(t_id)
+    try:
+        st = load_hermes_state()
+        title = ticket.get("title", "Paperclip Task")
+        desc = ticket.get("description", "")
+        model = ticket.get("model_used") or st["active_model"]
+        req_agent = st["agent_name"]
+
+        t0 = time.time()
+        steps = [
+            {"step": "Task Ingested", "time": "0.0s", "detail": f"Hermes Autonomous Worker claimed ticket {t_id} from Paperclip"},
+        ]
+        skills_used = [s["name"] for s in st["skills"][:4]]
+        steps.append({"step": "Skills Vault Prime", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Primed context with {len(skills_used)} active skills: {', '.join(skills_used)}"})
+        steps.append({"step": "Episodic Memory Load", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Retrieved {len(st['memories'])} cross-session memory fragments"})
+
+        full_prompt = f"[PAPERCLIP TICKET {t_id}] {title}\n\n{desc}"
+        steps.append({"step": "Ollama Inference Started", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Executing inference via local Ollama {st['ollama_url']} (model: {model})"})
+        print(f"[*] Hermes Pull Worker [{st['node_id']}] claimed ticket {t_id}: '{title}' -> starting Ollama inference with {model}...")
+
+        res = await asyncio.to_thread(run_ollama_inference, st, full_prompt, model, req_agent, "")
+
+        elapsed_s = max(0.1, round(time.time() - t0, 2))
+        tok_sec = round(res['tokens'] / elapsed_s, 1)
+        steps.append({"step": "Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {res['tokens']} tokens ({tok_sec} tok/sec in {res['duration_ms']} ms)"})
+        print(f"[✓] Hermes Pull Worker [{st['node_id']}] finished inference for {t_id}: {res['tokens']} tokens in {res['duration_ms']} ms ({tok_sec} tok/sec)")
+
+        st = load_hermes_state()
+        learned_skill = synthesize_skill_from_task(st, title, res["content"])
+        steps.append({"step": "Skill Synthesis", "time": f"{round(time.time() - t0, 2)}s", "detail": f"Saved autonomous reusable skill '{learned_skill}' into persistent Skills Vault"})
+
+        memory_summary = f"Completed ticket {t_id} ('{title}') with {model} on {st['node_id']} and synthesized '{learned_skill}'."
+        st["tasks_completed"] = st.get("tasks_completed", 0) + 1
+
+        completion_log = {
+            "id": f"hlog-{str(uuid.uuid4())[:8]}",
+            "ticket_id": t_id,
+            "title": title,
+            "agent_name": req_agent,
+            "node_id": st["node_id"],
+            "model": res["model"],
+            "tokens": res["tokens"],
+            "tok_per_sec": tok_sec,
+            "duration_ms": res["duration_ms"],
+            "completed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "learned_skill": learned_skill,
+            "memory_summary": memory_summary,
+            "steps": steps,
+            "status": "SUCCESS",
+        }
+        st.setdefault("ticket_completion_logs", []).insert(0, completion_log)
+        st["ticket_completion_logs"] = st["ticket_completion_logs"][:50]
+        save_hermes_state(st)
+
+        # Submit deliverable back to Paperclip Control Plane
+        p_url = st["paperclip_url"].rstrip("/")
+        cb_payload = {
+            "ticket_id": t_id,
+            "output": res["content"],
+            "tokens": res["tokens"],
+            "duration_ms": res["duration_ms"],
+            "model": res["model"],
+            "learned_skill": learned_skill,
+            "completion_log": completion_log,
+        }
+        req = urllib.request.Request(
+            f"{p_url}/api/hermes/complete_ticket",
+            data=json.dumps(cb_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            print(f"[✓] Successfully reported completion of {t_id} to Paperclip Control Plane!")
+    except Exception as exc:
+        print(f"[!] Error processing ticket {t_id}: {exc}")
+    finally:
+        ACTIVE_PROCESSING_TICKETS.discard(t_id)
+
+
+async def background_paperclip_task_worker():
+    await asyncio.sleep(4)
+    while True:
+        try:
+            st = load_hermes_state()
+            p_url = st["paperclip_url"].rstrip("/")
+            node_id = st.get("node_id", "")
+            req = urllib.request.Request(
+                f"{p_url}/api/hermes/tasks?node_id={node_id}",
+                headers={"User-Agent": f"Hermes-Node/{node_id}"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            tasks = data.get("tasks", [])
+            if tasks:
+                print(f"[*] Node [{node_id}] found {len(tasks)} queued tasks in Paperclip: {[t['id'] for t in tasks]}")
+            for t in tasks:
+                t_assigned = t.get("assigned_to", "")
+                is_mine = False
+                if t_assigned == f"agent-{node_id}":
+                    is_mine = True
+                elif "desktop" in node_id.lower() and ("desktop" in t_assigned.lower() or t_assigned == "agent-hermes-desktop-efrain"):
+                    is_mine = True
+                elif node_id == "hermes-k3s-primary" and t_assigned == "agent-hermes":
+                    is_mine = True
+                elif node_id == "hermes-host-17" and t_assigned == "agent-hermes-17":
+                    is_mine = True
+
+                if is_mine and t["id"] not in ACTIVE_PROCESSING_TICKETS:
+                    print(f"[*] Node [{node_id}] claimed ticket {t['id']}: '{t.get('title')}'!")
+                    asyncio.create_task(process_claimed_ticket(t))
+        except Exception as exc:
+            pass
+        await asyncio.sleep(2)
+
+
 async def background_paperclip_heartbeat():
     await asyncio.sleep(3)
     while True:
@@ -291,11 +414,13 @@ async def background_paperclip_heartbeat():
         except Exception:
             pass
         await asyncio.sleep(30)
+        await asyncio.sleep(25)
 
 
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(background_paperclip_heartbeat())
+    asyncio.create_task(background_paperclip_task_worker())
 
 
 @app.get("/", response_class=HTMLResponse)

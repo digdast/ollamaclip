@@ -569,6 +569,47 @@ async def update_agent_model(agent_id: str, payload: Dict[str, Any] = Body(...))
     raise HTTPException(status_code=404, detail="Agent not found")
 
 
+async def dispatch_ticket_to_n8n(ticket: Dict[str, Any]):
+    """Dispatches newly created tickets to n8n workflows in the cluster."""
+    endpoints = [
+        "http://n8n.ai.svc.cluster.local:5678/webhook/paperclip-ticket-created",
+        "http://192.168.0.81:30678/webhook/paperclip-ticket-created",
+    ]
+    payload = json.dumps({"ticket": ticket}).encode("utf-8")
+    for ep in endpoints:
+        try:
+            req = urllib.request.Request(
+                ep,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
+                method="POST",
+            )
+            await asyncio.to_thread(urllib.request.urlopen, req, timeout=3)
+            break
+        except Exception:
+            continue
+
+    # If ticket mentions automation or workflow, also trigger synthesizer webhook
+    full_text = (ticket.get("title", "") + " " + ticket.get("description", "")).lower()
+    if any(k in full_text for k in ["workflow", "automate", "automation", "pipeline", "n8n"]):
+        synth_endpoints = [
+            "http://n8n.ai.svc.cluster.local:5678/webhook/synthesize-workflow-from-ticket",
+            "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket",
+        ]
+        for ep in synth_endpoints:
+            try:
+                req = urllib.request.Request(
+                    ep,
+                    data=payload,
+                    headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
+                    method="POST",
+                )
+                await asyncio.to_thread(urllib.request.urlopen, req, timeout=3)
+                break
+            except Exception:
+                continue
+
+
 @app.post("/api/tickets")
 async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     state = load_state()
@@ -596,6 +637,9 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     state["tickets"].insert(0, ticket)
     add_audit(state, agent["name"], f"Created ticket {tck_id}: '{ticket['title']}' assigned to {agent['name']} ({agent['model']})", "INFO")
     save_state(state)
+
+    # Dispatches ticket creation event to n8n workflow cluster
+    asyncio.create_task(dispatch_ticket_to_n8n(ticket))
 
     if auto_execute:
         res = await execute_ticket_internal(tck_id)
@@ -894,6 +938,23 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         if cto_hiring_result:
             save_state(state)
 
+    # Check if assigned to Desktop worker (which pulls tasks outbound from Paperclip to bypass Windows firewall)
+    is_desktop_agent = "desktop" in agent.get("id", "").lower() or "desktop" in agent.get("name", "").lower()
+    if is_desktop_agent:
+        state = load_state()
+        ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
+        ticket["status"] = "QUEUED_FOR_DESKTOP"
+        add_audit(state, "Control Plane", f"Placed {ticket_id} into Desktop Hermes Work Queue (executing on local RTX 3060 GPU)", "INFO")
+        save_state(state)
+        
+        # Wait up to 240s for Desktop Hermes worker to process and submit via /api/hermes/complete_ticket
+        for _ in range(240):
+            await asyncio.sleep(1)
+            st_cur = load_state()
+            t_cur = next((t for t in st_cur["tickets"] if t["id"] == ticket_id), None)
+            if t_cur and t_cur.get("status") in ("COMPLETED", "AWAITING_APPROVAL"):
+                return {"ticket": t_cur, "state": st_cur}
+
     # Check if routed to Hermes bridge or if Hermes is enabled for all bots
     is_hermes = (
         agent.get("adapter") in ("hermes_bridge", "hermes")
@@ -946,7 +1007,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         headers={"Content-Type": "application/json"},
                         method="POST",
                     )
-                    with urllib.request.urlopen(req, timeout=180) as resp:
+                    with urllib.request.urlopen(req, timeout=12) as resp:
                         return json.loads(resp.read().decode("utf-8"))
 
                 h_res = await asyncio.to_thread(_call_hermes)
@@ -1030,6 +1091,24 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                 return {"ticket": ticket, "state": state}
             except Exception:
                 continue
+
+        # If direct push to candidate endpoints failed (e.g. desktop agent behind Windows Firewall),
+        # enqueue the ticket into the pull-worker queue so Hermes Desktop executes it via local GPU!
+        is_desktop_agent = "desktop" in agent.get("id", "").lower() or "desktop" in agent.get("name", "").lower()
+        if is_desktop_agent:
+            state = load_state()
+            ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
+            ticket["status"] = "QUEUED_FOR_DESKTOP"
+            add_audit(state, "Control Plane", f"Placed {ticket_id} into Desktop Hermes Work Queue (awaiting local RTX 3060 execution)", "INFO")
+            save_state(state)
+            
+            # Wait up to 120s for Desktop Hermes worker to process and submit via /api/hermes/complete_ticket
+            for _ in range(120):
+                await asyncio.sleep(1)
+                st_cur = load_state()
+                t_cur = next((t for t in st_cur["tickets"] if t["id"] == ticket_id), None)
+                if t_cur and t_cur.get("status") in ("COMPLETED", "AWAITING_APPROVAL"):
+                    return {"ticket": t_cur, "state": st_cur}
 
     # Ollama execution fallback / direct execution
     prompt = (
@@ -1146,11 +1225,39 @@ async def register_hermes_node(payload: Dict[str, Any] = Body(...)):
     if not found:
         state.setdefault("hermes_nodes", []).append(node_info)
 
-    # Also update agent-hermes model & status
-    for a in state["agents"]:
-        if a["id"] == "agent-hermes":
-            a["status"] = "ONLINE"
-            a["model"] = node_info["model"]
+    # Ensure corresponding agent exists in state["agents"]
+    agent_id = f"agent-{node_id}"
+    matched_agent = next((a for a in state["agents"] if a["id"] == agent_id), None)
+    is_desktop = "desktop" in node_id.lower() or "efrain" in node_id.lower()
+    ag_name = payload.get("agent_name") or node_info["name"].split("(")[0].strip() or "Hermes Worker"
+
+    if not matched_agent:
+        state["agents"].append({
+            "id": agent_id,
+            "name": ag_name,
+            "role": "Desktop Autonomous GPU Worker (RTX 3060 12GB)" if is_desktop else f"Autonomous Worker ({node_id})",
+            "department": "Autonomous Ops",
+            "reports_to": "agent-cto",
+            "adapter": "hermes_bridge",
+            "endpoint": node_info["endpoint"],
+            "model": node_info["model"],
+            "status": "ONLINE",
+            "budget_tokens": 2000000,
+            "tokens_used": 0,
+            "avatar": "⚡" if is_desktop else "🪽",
+            "system_prompt": f"You are {ag_name}, an autonomous self-improving agent running on {node_id}. Execute engineering tickets with high throughput and GPU acceleration.",
+        })
+    else:
+        matched_agent["endpoint"] = node_info["endpoint"]
+        matched_agent["status"] = "ONLINE"
+        matched_agent["model"] = node_info["model"]
+
+    # Also update agent-hermes if node is primary k3s worker
+    if node_id == "hermes-k3s-primary":
+        for a in state["agents"]:
+            if a["id"] == "agent-hermes":
+                a["status"] = "ONLINE"
+                a["model"] = node_info["model"]
 
     add_audit(state, node_info["name"], f"Hermes node '{node_id}' linked (Ollama: {node_info['ollama_url']}, Model: {node_info['model']})", "SUCCESS")
     save_state(state)
@@ -1158,17 +1265,81 @@ async def register_hermes_node(payload: Dict[str, Any] = Body(...)):
 
 
 @app.get("/api/hermes/tasks")
-async def get_hermes_queued_tasks():
+async def get_hermes_queued_tasks(node_id: str = ""):
     state = load_state()
-    hermes_agent_ids = {
-        a["id"] for a in state["agents"]
-        if a.get("adapter") == "hermes_bridge" or a["id"] == "agent-hermes"
-    }
     queued = [
         t for t in state["tickets"]
-        if t["assigned_to"] in hermes_agent_ids and t["status"] == "QUEUED"
+        if t["status"] in ("QUEUED", "QUEUED_FOR_DESKTOP")
     ]
+    if node_id:
+        target_agent_id = f"agent-{node_id}"
+        if "desktop" in node_id.lower():
+            filtered = [t for t in queued if t.get("assigned_to") == target_agent_id or "desktop" in t.get("assigned_to", "").lower()]
+        elif node_id == "hermes-k3s-primary":
+            filtered = [t for t in queued if t.get("assigned_to") in ("agent-hermes", target_agent_id)]
+        elif node_id == "hermes-host-17":
+            filtered = [t for t in queued if t.get("assigned_to") in ("agent-hermes-17", target_agent_id)]
+        else:
+            filtered = [t for t in queued if t.get("assigned_to") == target_agent_id]
+        return {"tasks": filtered, "ollama_url": state["ollama_url"]}
     return {"tasks": queued, "ollama_url": state["ollama_url"]}
+
+
+@app.post("/api/hermes/complete_ticket")
+async def complete_hermes_ticket_callback(payload: Dict[str, Any] = Body(...)):
+    """Receives completed ticket deliverables from autonomous pull workers (e.g. DESKTOP-EFRAIN RTX 3060)."""
+    ticket_id = payload.get("ticket_id")
+    state = load_state()
+    ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), None)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), state["agents"][0])
+    ticket["output"] = payload.get("output", "")
+    ticket["tokens"] = int(payload.get("tokens", 250))
+    ticket["duration_ms"] = float(payload.get("duration_ms", 1200))
+    ticket["model_used"] = payload.get("model", agent["model"])
+    ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
+    ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    agent["status"] = "ONLINE"
+    agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+
+    c_log = payload.get("completion_log")
+    if c_log:
+        ticket["hermes_log"] = c_log
+        state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
+        state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
+
+    add_audit(state, agent["name"], f"Hermes completed {ticket_id} via autonomous worker loop ({ticket['tokens']} tokens in {ticket['duration_ms']} ms)", "SUCCESS")
+    save_state(state)
+
+    # Deliver to Telegram with zero truncation
+    try:
+        tg = get_telegram_config(state)
+        if tg.get("enabled") and tg.get("notify_on_ticket_completed") and tg.get("bot_token") and tg.get("chat_id"):
+            tg_header = (
+                f"📎 <b>Ticket Deliverable Ready: {ticket_id}</b>\n"
+                f"<b>Title:</b> {html.escape(ticket['title'])}\n"
+                f"<b>Agent:</b> {agent.get('avatar', '⚡')} {html.escape(agent['name'])} ({html.escape(agent['role'])})\n"
+                f"<b>Node:</b> <code>{c_log.get('node_id', 'hermes-desktop-efrain') if c_log else 'hermes-desktop'}</code> | <b>Model:</b> <code>{ticket.get('model_used')}</code>\n"
+                f"<b>Learned Skill:</b> <code>{c_log.get('learned_skill', 'autonomous-ops') if c_log else 'autonomous-ops'}</code>\n"
+                f"<b>Speed:</b> {ticket.get('tokens')} tokens in {ticket.get('duration_ms')} ms"
+            )
+            asyncio.create_task(
+                asyncio.to_thread(
+                    send_telegram_deliverable,
+                    tg["bot_token"],
+                    tg["chat_id"],
+                    tg_header,
+                    ticket.get("output", ""),
+                    ticket_id,
+                    ticket["title"],
+                )
+            )
+    except Exception:
+        pass
+
+    return {"ok": True, "ticket": ticket, "state": state}
 
 
 @app.get("/api/hermes/ticket_logs")
@@ -1973,6 +2144,117 @@ async def delete_ollama_model(payload: Dict[str, Any] = Body(...)):
     save_state(state)
     ollama_info = await asyncio.to_thread(probe_ollama, state["ollama_url"])
     return {"ok": True, "ollama": ollama_info, "state": state}
+
+
+# --- N8N WORKFLOW AUTOMATION ENGINE ---
+@app.post("/api/audit")
+async def log_external_audit(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    actor = payload.get("actor") or payload.get("agent") or "n8n Automation"
+    event = payload.get("event") or payload.get("message") or "External action completed"
+    level = payload.get("level") or "SUCCESS"
+    add_audit(state, actor, event, level)
+    save_state(state)
+    return {"ok": True}
+
+
+@app.get("/api/n8n/workflows")
+async def list_n8n_workflows():
+    state = load_state()
+    workflows = [
+        {
+            "id": "paperclip-ticket-created",
+            "name": "Paperclip Ticket Ingestion & Swarm Dispatcher",
+            "slug": "paperclip-ticket-created",
+            "trigger_type": "Webhook (Instant)",
+            "url": "http://192.168.0.81:30678/webhook/paperclip-ticket-created",
+            "status": "ACTIVE",
+            "source": "Core Orchestrator",
+            "description": "Auto-ingests all tickets created in Paperclip, routes to GPU nodes (Desktop RTX 3060, Host 17, K3s) and logs audit.",
+        },
+        {
+            "id": "tck-101-k3s-autoscaling",
+            "name": "TCK-101: K3s Autoscaling & NVMe Storage Automation",
+            "slug": "tck-101-k3s-autoscaling",
+            "trigger_type": "Schedule (Every 2h) & Webhook",
+            "url": "http://192.168.0.81:30678/webhook/tck-101-k3s-autoscaling",
+            "status": "ACTIVE",
+            "source": "Ticket TCK-101",
+            "description": "Monitors K3s cluster storage isolation, SQLite WAL NVMe pinning, and HorizontalPodAutoscaler QoS enforcement.",
+        },
+        {
+            "id": "tck-102-rtx3060-benchmark",
+            "name": "TCK-102: RTX 3060 CUDA Hardware Benchmark",
+            "slug": "tck-102-rtx3060-benchmark",
+            "trigger_type": "Schedule (Every 6h) & Webhook",
+            "url": "http://192.168.0.81:30678/webhook/tck-102-rtx3060-benchmark",
+            "status": "ACTIVE",
+            "source": "Ticket TCK-102",
+            "description": "Dispatches automated inference latency and tokens/sec telemetry benchmark to DESKTOP-EFRAIN RTX 3060 12GB GPU.",
+        },
+        {
+            "id": "synthesize-workflow-from-ticket",
+            "name": "Autonomous Ticket-to-Workflow Synthesizer",
+            "slug": "synthesize-workflow-from-ticket",
+            "trigger_type": "Webhook (Instant)",
+            "url": "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket",
+            "status": "ACTIVE",
+            "source": "Core Blueprint Synthesizer",
+            "description": "Autonomous blueprint synthesizer generating active production n8n workflows from user requests.",
+        },
+    ]
+    return {
+        "ok": True,
+        "n8n_base_url": "http://192.168.0.81:30678",
+        "workflows": workflows,
+    }
+
+
+@app.post("/api/n8n/trigger")
+async def trigger_n8n_workflow_endpoint(payload: Dict[str, Any] = Body(...)):
+    slug = payload.get("slug", "paperclip-ticket-created")
+    custom_data = payload.get("data", {})
+    url = f"http://192.168.0.81:30678/webhook/{slug}"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(custom_data).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "Paperclip-UI/2.0"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        res = {"message": f"Trigger submitted: {exc}"}
+    state = load_state()
+    add_audit(state, "n8n Webhook", f"Manually triggered workflow '{slug}' via Control Plane", "SUCCESS")
+    save_state(state)
+    return {"ok": True, "result": res}
+
+
+@app.post("/api/n8n/create_workflow_from_ticket")
+async def create_workflow_from_ticket_endpoint(payload: Dict[str, Any] = Body(...)):
+    ticket_id = payload.get("ticket_id")
+    state = load_state()
+    target_ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), None)
+    if not target_ticket:
+        raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found")
+
+    # Dispatch to n8n synthesizer webhook
+    synth_url = "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket"
+    req_body = json.dumps({"ticket": target_ticket}).encode("utf-8")
+    req = urllib.request.Request(
+        synth_url,
+        data=req_body,
+        headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        res = json.loads(resp.read().decode("utf-8"))
+
+    add_audit(state, "Paperclip Engine", f"Created n8n automation workflow for {ticket_id} ('{target_ticket['title']}')", "SUCCESS")
+    save_state(state)
+    return {"ok": True, "ticket": target_ticket, "result": res}
 
 
 @app.get("/download/paperclip-hermes-suite.zip")
