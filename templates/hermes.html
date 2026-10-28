@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes-Ollama — Self-Improving Autonomous Agent</title>
+  <style>
+    :root {
+      --bg: #070a12;
+      --panel: #0e1422;
+      --panel-alt: #131b2e;
+      --border: #1e2d4a;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --cyan: #06b6d4;
+      --green: #10b981;
+      --purple: #8b5cf6;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: rgba(14, 20, 34, 0.92);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.15rem;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: #041016;
+      font-weight: 900;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .dot.off {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+
+    .connector-bar {
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(139, 92, 246, 0.12));
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .conn-inputs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input,
+    select,
+    textarea {
+      background: #080d18;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent), #d97706);
+      color: #070a12;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .btn-secondary {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 22px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-log {
+      height: 430px;
+      overflow-y: auto;
+      background: #060911;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .msg {
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .msg.user {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      align-self: flex-end;
+      max-width: 85%;
+    }
+
+    .msg.agent {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      width: 100%;
+    }
+
+    .skill-item,
+    .mem-item {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-badge">HERMES-01</span>
+      <span>Hermes-Ollama Self-Improving Autonomous Agent</span>
+    </div>
+    <div class="status-row">
+      <div class="pill">
+        <span class="dot" id="ollamaDot"></span>
+        <span id="ollamaLabel">Ollama: Checking...</span>
+      </div>
+      <div class="pill">
+        <span class="dot" id="clipDot"></span>
+        <span id="clipLabel">Paperclip: Checking...</span>
+      </div>
+      <a id="paperclipLink" href="#" target="_blank" class="btn btn-secondary" style="text-decoration:none">Open
+        Paperclip Control Plane ↗</a>
+    </div>
+  </header>
+
+  <div class="connector-bar">
+    <div style="font-size:0.85rem;font-weight:600;color:var(--accent)">
+      ⚡ 1-Click Dual Bridge (Ollama + Paperclip Control Plane)
+    </div>
+    <div class="conn-inputs">
+      <label style="font-size:0.78rem;color:var(--muted)">Ollama URL:</label>
+      <input type="text" id="ollamaInput" value="http://192.168.0.17:11434" style="width:210px">
+      <label style="font-size:0.78rem;color:var(--muted)">Paperclip URL:</label>
+      <input type="text" id="clipInput" value="http://paperclip.ai.svc.cluster.local:7891" style="width:260px">
+      <select id="modelSelect"></select>
+      <button class="btn" onclick="saveConnections()">Connect & Sync Now</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div>
+      <div class="card">
+        <div class="card-title">
+          <span>Interactive Autonomous Console + Skill Loop</span>
+          <span class="badge" id="activeModelBadge">Model: qwen2.5-coder:7b</span>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <div style="display:flex;gap:10px">
+          <input type="text" id="chatPrompt"
+            placeholder="Ask Hermes-01 to engineer code, diagnose K3s, or synthesize a new skill..." style="flex:1"
+            onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn" id="sendBtn" onclick="sendChat()">Execute & Learn</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">
+          <span>Episodic Memory Bank (Cross-Session Recall)</span>
+          <span class="badge" id="memCount">0 memories</span>
+        </div>
+        <div id="memoryList"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-title">
+          <span>Self-Improving Skills Vault</span>
+          <span class="badge" id="skillCount">0 skills</span>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+          Procedural skills synthesized autonomously after completing Paperclip tickets and interactive tasks.
+        </p>
+        <div id="skillsList" style="max-height:380px;overflow-y:auto"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">
+          <span>⬇️ Ollama Hub Downloader (ollama.com/library?sort=popular)</span>
+          <a href="https://ollama.com/library?sort=popular" target="_blank" class="badge"
+            style="text-decoration:none">ollama.com ↗</a>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="text" id="hermesPullInput" placeholder="e.g. llama3.2:3b or deepseek-r1:14b"
+            style="flex:1;font-family:monospace">
+          <button class="btn" onclick="pullFromHermes()">⬇️ Pull to 192.168.0.17</button>
+        </div>
+        <div id="hermesHubList" style="max-height:260px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentState = null;
+
+    async function loadState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        const st = data.state;
+        const ollama = data.ollama;
+        currentState = data;
+
+        const host = window.location.hostname || '192.168.0.81';
+        document.getElementById('paperclipLink').href = `http://${host}:30791`;
+
+        const oDot = document.getElementById('ollamaDot');
+        const oLabel = document.getElementById('ollamaLabel');
+        if (ollama && ollama.connected) {
+          oDot.className = 'dot';
+          oLabel.textContent = `Ollama v${ollama.version}: ${ollama.url} (${ollama.models.length} models · ${ollama.latency_ms}ms)`;
+        } else {
+          oDot.className = 'dot off';
+          oLabel.textContent = `Ollama Disconnected`;
+        }
+
+        const cDot = document.getElementById('clipDot');
+        const cLabel = document.getElementById('clipLabel');
+        if (st.paperclip_connected) {
+          cDot.className = 'dot';
+          cLabel.textContent = `Paperclip Linked (${st.node_id} · ${st.tasks_completed} tasks)`;
+        } else {
+          cDot.className = 'dot off';
+          cLabel.textContent = `Paperclip Offline`;
+        }
+
+        document.getElementById('ollamaInput').value = st.ollama_url;
+        document.getElementById('clipInput').value = st.paperclip_url;
+        document.getElementById('activeModelBadge').textContent = `Model: ${st.active_model}`;
+
+        const sel = document.getElementById('modelSelect');
+        if (ollama && ollama.models.length > 0 && sel.options.length !== ollama.models.length) {
+          sel.innerHTML = ollama.models.map(m =>
+            `<option value="${m.name}" ${m.name === st.active_model ? 'selected' : ''}>${m.name} (${m.size_gb} GB)</option>`
+          ).join('');
+        }
+
+        const log = document.getElementById('chatLog');
+        if (st.chat_history && st.chat_history.length > 0) {
+          log.innerHTML = st.chat_history.map(m => {
+            if (m.role === 'user') {
+              return `<div class="msg user">${m.content}</div>`;
+            } else {
+              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[${m.model}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Skill: ' + m.learned_skill : ''}]</div>` : '';
+              return `<div class="msg agent">${meta}${m.content}</div>`;
+            }
+          }).join('');
+        }
+
+        document.getElementById('skillCount').textContent = `${st.skills.length} skills`;
+        document.getElementById('skillsList').innerHTML = st.skills.map(s => `
+      <div class="skill-item">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:var(--accent);font-size:0.9rem">${s.name}</strong>
+          <span class="badge">${s.category} · Used ${s.uses}x</span>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${s.description}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${s.created_at}</div>
+      </div>
+    `).join('');
+
+        document.getElementById('memCount').textContent = `${st.memories.length} memories`;
+        document.getElementById('memoryList').innerHTML = st.memories.map(m => `
+      <div class="mem-item">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <strong style="color:var(--cyan);font-size:0.82rem">${(m.tags || []).join(', ') || 'Memory'}</strong>
+          <span style="font-size:0.74rem;color:var(--muted)">${m.timestamp}</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text)">${m.summary}</div>
+      </div>
+    `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveConnections() {
+      const ollama_url = document.getElementById('ollamaInput').value.trim();
+      const paperclip_url = document.getElementById('clipInput').value.trim();
+      const active_model = document.getElementById('modelSelect').value || 'qwen2.5-coder:7b';
+      await fetch('/api/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ollama_url, paperclip_url, active_model })
+      });
+      await loadState();
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chatPrompt');
+      const prompt = input.value.trim();
+      if (!prompt) return;
+      input.value = '';
+      const log = document.getElementById('chatLog');
+      log.innerHTML += `<div class="msg user">${prompt}</div>`;
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = true;
+      btn.textContent = 'Thinking...';
+      log.scrollTop = log.scrollHeight;
+
+      try {
+        const model = document.getElementById('modelSelect').value || 'qwen2.5-coder:7b';
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, model })
+        });
+        await loadState();
+        log.scrollTop = log.scrollHeight;
+      } catch (e) {
+        log.innerHTML += `<div class="msg agent" style="color:var(--red)">Error: ${e}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Execute & Learn';
+      }
+    }
+
+    loadState();
+    setInterval(loadState, 8000);
+
+    async function loadHermesHub() {
+      try {
+        const res = await fetch('/api/ollama/library');
+        const data = await res.json();
+        const models = (data.models || []).slice(0, 12);
+        document.getElementById('hermesHubList').innerHTML = models.map(m => {
+          const defTag = (m.sizes && m.sizes[0]) || m.default_tag || 'latest';
+          return `
+            <div class="skill-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <div>
+                <strong style="color:var(--cyan);font-family:monospace">${m.name}:${defTag}</strong>
+                <span class="badge" style="margin-left:6px">${m.is_installed ? '✓ Installed' : (m.pulls || 'Popular')}</span>
+                <div style="font-size:0.76rem;color:var(--muted);margin-top:3px">${(m.description || '').slice(0, 90)}...</div>
+              </div>
+              <button class="btn" style="padding:6px 10px;font-size:0.76rem;white-space:nowrap" onclick="pullModelTag('${m.name}:${defTag}')">⬇️ Download</button>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function pullModelTag(modelTag) {
+      await fetch('/api/ollama/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelTag })
+      });
+      alert(`Started downloading ${modelTag} onto Ollama (192.168.0.17:11434)! View live progress bar in Paperclip Ollama Hub tab.`);
+    }
+
+    async function pullFromHermes() {
+      const inp = document.getElementById('hermesPullInput');
+      const val = (inp?.value || '').trim();
+      if (!val) return;
+      inp.value = '';
+      await pullModelTag(val);
+    }
+
+    loadHermesHub();
+  </script>
+</body>
+
+</html>

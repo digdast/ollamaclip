@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paperclip-Ollama — Zero-Human AI Company Control Plane & Product Portal</title>
+  <style>
+    :root {
+      --bg-base: #060913;
+      --bg-panel: rgba(15, 23, 42, 0.82);
+      --bg-card: rgba(30, 41, 59, 0.58);
+      --border: rgba(148, 163, 184, 0.16);
+      --border-glow: rgba(56, 189, 248, 0.45);
+      --cyan: #38bdf8;
+      --indigo: #6366f1;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --purple: #a855f7;
+      --rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.12), transparent 40%),
+        var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+    }
+
+    /* Topbar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(6, 9, 19, 0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--cyan), var(--indigo));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .brand h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 10.5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--cyan);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-sub);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .ollama-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      font-family: ui-monospace, monospace;
+      font-size: 11.5px;
+      color: #34d399;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .container {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 24px 26px 60px;
+    }
+
+    .view-section {
+      display: none;
+    }
+
+    .view-section.active {
+      display: block;
+    }
+
+    /* Quick Connect Ollama Bar */
+    .connect-bar {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 10px 30px -10px rgba(56, 189, 248, 0.2);
+    }
+
+    .connect-inputs {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .input-box,
+    .select-box,
+    textarea {
+      background: rgba(6, 9, 19, 0.85);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 9px 13px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .input-box:focus,
+    .select-box:focus,
+    textarea:focus {
+      border-color: var(--cyan);
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 9px 15px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      border-color: var(--cyan);
+      background: rgba(56, 189, 248, 0.14);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #0d9488);
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+
+    /* Section Headers */
+    .sec-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 22px 0 12px;
+    }
+
+    .sec-hdr h2 {
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text-sub);
+    }
+
+    /* Org Chart Grid */
+    .org-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+
+    .agent-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      position: relative;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .agent-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+    }
+
+    .agent-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .agent-identity {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 21px;
+    }
+
+    .agent-name {
+      font-size: 15.5px;
+      font-weight: 700;
+    }
+
+    .agent-role {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .status-tag {
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .agent-meta {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin: 10px 0;
+    }
+
+    /* Main Split Layout: Composer + Ticket Board */
+    .split-grid {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 1100px) {
+      .split-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .field {
+      margin-bottom: 13px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11.5px;
+      font-family: ui-monospace, monospace;
+      color: var(--text-sub);
+      margin-bottom: 5px;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+    }
+
+    .ticket-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .ticket-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 10px;
+    }
+
+    .ticket-output {
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 13px;
+      margin-top: 10px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      max-height: 320px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    /* Models Grid */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+
+    .model-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    /* Product Website Hero */
+    .hero-box {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.75));
+      border: 1px solid var(--border-glow);
+      border-radius: 20px;
+      padding: 48px 36px;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .hero-box h1 {
+      font-size: 38px;
+      font-weight: 900;
+      letter-spacing: -0.8px;
+      margin-bottom: 14px;
+      background: linear-gradient(90deg, #fff, #38bdf8, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-box p {
+      font-size: 16.5px;
+      color: var(--text-sub);
+      max-width: 780px;
+      margin: 0 auto 24px;
+      line-height: 1.6;
+    }
+
+    .code-block {
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      font-family: ui-monospace, monospace;
+      font-size: 12.5px;
+      color: #a7f3d0;
+      text-align: left;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">📎</div>
+      <div>
+        <h1>
+          Paperclip-Ollama
+          <span class="badge">CLIP-OS v1.0</span>
+        </h1>
+        <div style="font-size:11.5px; color:var(--text-sub);" id="companySubtitle">
+          Zero-Human AI Company Control Plane • Native Ollama & Hermes Edition
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('website', this)">🌐 Website & Download</button>
+      <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
+      <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
+      <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
+      <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
+    </nav>
+
+    <div class="ollama-pill" id="ollamaStatusPill">
+      <span class="dot"></span>
+      <span id="ollamaStatusText">Ollama: Connecting...</span>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- 1-CLICK OLLAMA CONNECTION BANNER (ALWAYS ACCESSIBLE) -->
+    <div class="connect-bar">
+      <div>
+        <div style="font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;">
+          <span>⚡ 1-Click Dedicated Ollama Connector</span>
+          <span class="badge" id="discoveredModelsBadge">14 Models Ready</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
+          Point Paperclip & Hermes at any local or LAN Ollama server — auto-discovers GGUF models, context windows &
+          capabilities.
+        </div>
+      </div>
+      <div class="connect-inputs">
+        <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
+          value="http://192.168.0.17:11434" />
+        <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
+        <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
+          Agent UI</a>
+      </div>
+    </div>
+
+    <!-- VIEW 1: PRODUCT WEBSITE & SOFTWARE HOSTING (paperclip.ing style) -->
+    <section class="view-section active" id="view-website">
+      <div class="hero-box">
+        <span class="badge" style="font-size:12px; padding:4px 12px;">OPEN-SOURCE LOCAL AI COMPANY STACK</span>
+        <h1 style="margin-top:14px;">Orchestrate Autonomous AI Companies Powered Natively by Local Ollama.</h1>
+        <p>
+          Inspired by <strong>paperclip.ing</strong> and <strong>Nous Research's Hermes Agent</strong>—re-engineered
+          from the ground up
+          for effortless <strong>1-click connectivity to local Ollama (`192.168.0.17:11434`)</strong>. Assign roles
+          across an AI Org Chart,
+          dispatch engineering tickets, enforce governance approvals, and let <strong>Hermes-01</strong> synthesize
+          reusable skills automatically.
+        </p>
+        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+          <button class="btn btn-primary" style="padding:12px 22px; font-size:14px;"
+            onclick="switchTab('control', document.querySelectorAll('.tab-btn')[1])">
+            🚀 Launch Paperclip Control Plane
+          </button>
+          <a class="btn btn-emerald" style="padding:12px 22px; font-size:14px;"
+            href="/download/paperclip-hermes-suite.zip">
+            📦 Download Full Software Suite (.zip)
+          </a>
+          <a class="btn" style="padding:12px 22px; font-size:14px;" id="heroHermesLink" href="http://192.168.0.81:30792"
+            target="_blank">
+            🪽 Launch Hermes Agent Console
+          </a>
+        </div>
+      </div>
+
+      <div class="org-grid">
+        <div class="panel">
+          <h3 style="margin-bottom:8px; color:var(--cyan);">📎 1. Paperclip-Ollama Control Plane</h3>
+          <p style="font-size:13px; color:var(--text-sub); line-height:1.55;">
+            Visual AI corporate hierarchy (CEO, CTO, Staff Coder, Hermes Field Worker, QA Security Auditor). Assign any
+            model from
+            your Ollama server (`qwen3.5`, `qwen2.5-coder:32b`, `devstral-small-2`, `DeepSeek-R1`) to any employee in a
+            single click.
+          </p>
+        </div>
+        <div class="panel">
+          <h3 style="margin-bottom:8px; color:var(--purple);">🪽 2. Hermes Self-Improving Agent</h3>
+          <p style="font-size:13px; color:var(--text-sub); line-height:1.55;">
+            Built-in bi-directional adapter (`/api/hermes/register` & `/api/execute_ticket`). Every ticket Hermes
+            completes
+            synthesizes a reusable skill into its persistent Skills Vault and Cross-Session Episodic Memory.
+          </p>
+        </div>
+        <div class="panel">
+          <h3 style="margin-bottom:8px; color:var(--emerald);">🦙 3. Zero-Cloud 100% Local Ollama</h3>
+          <p style="font-size:13px; color:var(--text-sub); line-height:1.55;">
+            Pre-wired to `http://192.168.0.17:11434` with zero external API keys or per-token charges. Full data
+            sovereignty
+            running natively inside your 7-node Proxmox HA K3s cluster.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin-bottom:10px;">⚡ Quickstart & Self-Hosting Commands (Windows, Linux, macOS & K3s)</h3>
+        <div class="code-block"># 1. Download & Extract the Hosted Software Bundle directly from this server:
+          curl -O http://192.168.0.81:30791/download/paperclip-hermes-suite.zip
+          unzip paperclip-hermes-suite.zip && cd paperclip-hermes-ollama
+
+          # 2. Run Paperclip-Ollama Control Plane (Port 7891) + Hermes Agent (Port 7892):
+          export OLLAMA_URL="http://192.168.0.17:11434"
+          python3 paperclip_server.py &
+          python3 hermes_agent.py &
+
+          # 3. Or deploy natively to K3s cluster:
+          kubectl apply -f k8s-paperclip-hermes.yaml</div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: AI ORG CHART & TICKET BOARD -->
+    <section class="view-section" id="view-control">
+      <div class="sec-hdr">
+        <h2>🏢 AI Company Org Chart — Click Model Dropdown to Reassign Ollama Model</h2>
+      </div>
+      <div class="org-grid" id="orgChartGrid"></div>
+
+      <div class="split-grid">
+        <div class="panel">
+          <h3 style="margin-bottom:14px;">➕ Dispatch New Company Ticket</h3>
+          <div class="field">
+            <label>Ticket Title / Objective</label>
+            <input type="text" id="tckTitle" class="input-box"
+              placeholder="e.g., Write a Python K3s pod health check script" />
+          </div>
+          <div class="field">
+            <label>Assign to AI Employee</label>
+            <select id="tckAgent" class="select-box"></select>
+          </div>
+          <div class="field">
+            <label>Priority</label>
+            <select id="tckPriority" class="select-box">
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH" selected>HIGH</option>
+              <option value="MEDIUM">MEDIUM</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Detailed Instructions & Context</label>
+            <textarea id="tckDesc" rows="5"
+              placeholder="Describe the technical deliverable, constraints, or architecture requirements..."></textarea>
+          </div>
+          <button class="btn btn-primary" id="submitTicketBtn" style="width:100%; justify-content:center; padding:11px;"
+            onclick="createTicket()">
+            🚀 Dispatch & Execute via Ollama (192.168.0.17)
+          </button>
+        </div>
+
+        <div class="panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h3>📋 Active Company Tickets & Deliverables</h3>
+            <button class="btn" onclick="loadState()">🔄 Refresh Board</button>
+          </div>
+          <div id="ticketsContainer"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: OLLAMA MODEL HUB (INSTALLED + OLLAMA.COM/LIBRARY?SORT=POPULAR DOWNLOADER) -->
+    <section class="view-section" id="view-ollama">
+      <div class="panel"
+        style="margin-bottom:20px; background:linear-gradient(90deg, rgba(14,165,233,0.12), rgba(168,85,247,0.12)); border-color:var(--border-glow);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+          <div>
+            <div style="font-weight:800; font-size:16px; display:flex; align-items:center; gap:10px;">
+              <span>🌐 Ollama Hub Model Downloader</span>
+              <a href="https://ollama.com/library?sort=popular" target="_blank" class="badge"
+                style="text-decoration:none; color:#38bdf8;">
+                ollama.com/library?sort=popular ↗
+              </a>
+            </div>
+            <div style="font-size:12.5px; color:var(--text-sub); margin-top:4px;">
+              Browse and 1-click download popular models directly onto your Ollama server (<code
+                id="ollamaHubUrl">http://192.168.0.17:11434</code>).
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input type="text" id="customPullInput" class="input-box" style="width:240px; font-family:monospace;"
+              placeholder="e.g. llama3.2:3b or phi4:latest" />
+            <button class="btn btn-primary" onclick="pullCustomModel()">⬇️ Pull Model Now</button>
+            <input type="text" id="hubSearchInput" class="input-box" style="width:220px;"
+              placeholder="🔍 Filter popular models..." oninput="filterLibraryModels()" />
+          </div>
+        </div>
+
+        <!-- ACTIVE DOWNLOAD PROGRESS BARS -->
+        <div id="activePullsContainer" style="margin-top:14px; display:none;"></div>
+      </div>
+
+      <div class="sec-hdr">
+        <h2>🔥 Popular Models on Ollama Hub (<code>https://ollama.com/library?sort=popular</code>)</h2>
+        <button class="btn" onclick="loadOllamaLibrary()">🔄 Sync Popular Catalog</button>
+      </div>
+      <div class="models-grid" id="hubLibraryGrid" style="margin-bottom:28px;"></div>
+
+      <div class="sec-hdr">
+        <h2>✅ Installed Models on Local Ollama Server (<code>192.168.0.17:11434</code>)</h2>
+      </div>
+      <div class="models-grid" id="modelsGrid"></div>
+    </section>
+
+    <!-- VIEW 4: HERMES BRIDGE -->
+    <section class="view-section" id="view-hermes">
+      <div class="sec-hdr">
+        <h2>🪽 Hermes Autonomous Self-Improving Worker Nodes</h2>
+      </div>
+      <div id="hermesNodesGrid" class="org-grid"></div>
+    </section>
+
+    <!-- VIEW 5: AUDIT LOGS -->
+    <section class="view-section" id="view-audit">
+      <div class="sec-hdr">
+        <h2>📜 Corporate Governance & Execution Audit Log</h2>
+      </div>
+      <div class="panel" id="auditList"></div>
+    </section>
+
+  </main>
+
+  <script>
+    let appData = null;
+
+    // Dynamically point Hermes UI button to same host on port 30792 (or 7892 locally)
+    const hermesPort = location.port === '7891' ? '7892' : '30792';
+    const hermesUrl = `${location.protocol}//${location.hostname}:${hermesPort}`;
+    document.getElementById('openHermesBtn').href = hermesUrl;
+    document.getElementById('heroHermesLink').href = hermesUrl;
+
+    function switchTab(viewName, btn) {
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      document.getElementById('view-' + viewName).classList.add('active');
+      if (btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    }
+
+    async function loadState() {
+      const res = await fetch('/api/state');
+      appData = await res.json();
+      renderAll();
+    }
+
+    function renderAll() {
+      if (!appData) return;
+      const st = appData.state;
+      const ol = appData.ollama;
+
+      document.getElementById('ollamaUrlInput').value = st.ollama_url;
+      document.getElementById('ollamaHubUrl').textContent = `${ol.url} (Ollama v${ol.version} • ${ol.latency_ms} ms)`;
+      document.getElementById('discoveredModelsBadge').textContent = `${ol.models_count} Models Ready`;
+      document.getElementById('ollamaStatusText').textContent = ol.connected
+        ? `Ollama ${ol.url} • v${ol.version} (${ol.models_count} Models)`
+        : `Ollama Offline (${ol.url})`;
+
+      const modelNames = ol.models.length > 0
+        ? ol.models.map(m => m.name)
+        : ['qwen2.5-coder:7b', 'qwen3.5:latest', 'qwen3:4b-instruct', 'qwen2.5-coder:1.5b'];
+
+      // Render Org Chart
+      document.getElementById('orgChartGrid').innerHTML = st.agents.map(a => {
+        const opts = modelNames.map(m => `<option value="${m}" ${m === a.model ? 'selected' : ''}>${m}</option>`).join('');
+        return `
+          <div class="agent-card">
+            <div class="agent-top">
+              <div class="agent-identity">
+                <div class="avatar">${a.avatar}</div>
+                <div>
+                  <div class="agent-name">${a.name}</div>
+                  <div class="agent-role">${a.role}</div>
+                </div>
+              </div>
+              <span class="status-tag">${a.status}</span>
+            </div>
+            <div class="agent-meta">
+              Adapter: <strong>${a.adapter}</strong> • Tokens Used: <strong>${a.tokens_used.toLocaleString()}</strong>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label>Assigned Ollama Model</label>
+              <select class="select-box" onchange="changeAgentModel('${a.id}', this.value)">
+                ${opts}
+              </select>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Populate Ticket Agent Dropdown
+      const selAgent = document.getElementById('tckAgent');
+      const prevVal = selAgent.value;
+      selAgent.innerHTML = st.agents.map(a => `<option value="${a.id}">${a.avatar} ${a.name} — ${a.role} (${a.model})</option>`).join('');
+      if (prevVal) selAgent.value = prevVal;
+
+      // Render Tickets
+      document.getElementById('ticketsContainer').innerHTML = st.tickets.map(t => {
+        const ag = st.agents.find(a => a.id === t.assigned_to) || { name: t.assigned_to, avatar: '🤖' };
+        const approveBtn = (t.status === 'AWAITING_APPROVAL' || !t.approved)
+          ? `<button class="btn btn-emerald" onclick="approveTicket('${t.id}')">✅ Approve & Merge</button>`
+          : `<span class="badge" style="color:#34d399; border-color:#10b981;">✓ Governance Approved</span>`;
+        return `
+          <div class="ticket-card">
+            <div class="ticket-hdr">
+              <div>
+                <span class="badge">${t.id}</span>
+                <strong style="font-size:14.5px; margin-left:6px;">${t.title}</strong>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge">${t.status}</span>
+                ${approveBtn}
+              </div>
+            </div>
+            <div style="font-size:12px; color:var(--text-sub); margin-bottom:6px;">
+              Assigned to: <strong>${ag.avatar} ${ag.name}</strong> • Model: <code>${t.model_used}</code> •
+              ${t.tokens} tokens (${t.duration_ms} ms) • ${t.updated_at}
+            </div>
+            <div style="font-size:12.5px; color:var(--text-muted);">${t.description}</div>
+            <div class="ticket-output">${escapeHtml(t.output || '')}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Render Ollama Models Grid
+      document.getElementById('modelsGrid').innerHTML = ol.models.map(m => `
+        <div class="model-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="font-size:14px; color:var(--cyan); font-family:monospace;">${m.name}</strong>
+            <span class="badge">${m.parameter_size || m.size_gb + ' GB'}</span>
+          </div>
+          <div style="font-size:12px; color:var(--text-sub); font-family:monospace; margin-bottom:8px;">
+            Size: ${m.size_gb} GiB • Quant: ${m.quantization} • Context: ${(m.context_length / 1024).toFixed(0)}K
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+              ${(m.capabilities || []).map(c => `<span class="badge">${c}</span>`).join('')}
+            </div>
+            <button class="btn" style="padding:4px 8px; font-size:11px; color:#f87171;" onclick="deleteModel('${m.name}')">🗑️ Remove</button>
+          </div>
+        </div>
+      `).join('');
+
+      // Render Hermes Nodes
+      document.getElementById('hermesNodesGrid').innerHTML = (st.hermes_nodes || []).map(n => `
+        <div class="agent-card">
+          <div class="agent-top">
+            <div class="agent-identity">
+              <div class="avatar">🪽</div>
+              <div>
+                <div class="agent-name">${n.name}</div>
+                <div class="agent-role">Node ID: ${n.node_id}</div>
+              </div>
+            </div>
+            <span class="status-tag">${n.status}</span>
+          </div>
+          <div class="agent-meta">
+            <div>Ollama Link: <code>${n.ollama_url}</code></div>
+            <div>Active Model: <code>${n.model}</code></div>
+            <div>Learned Skills: <strong>${n.skills_count}</strong> • Episodic Memories: <strong>${n.memories_count}</strong></div>
+            <div>Last Heartbeat: ${n.last_heartbeat}</div>
+          </div>
+          <a class="btn btn-emerald" href="${hermesUrl}" target="_blank" style="width:100%; justify-content:center;">
+            🪽 Open Hermes Self-Improving Console
+          </a>
+        </div>
+      `).join('');
+
+      // Render Audit Logs
+      document.getElementById('auditList').innerHTML = st.audit_logs.map(l => `
+        <div style="padding:9px 0; border-bottom:1px solid var(--border); font-family:monospace; font-size:12px; display:flex; justify-content:space-between; gap:12px;">
+          <div>
+            <span class="badge">${l.actor}</span>
+            <span style="margin-left:8px; color:var(--text-main);">${escapeHtml(l.event)}</span>
+          </div>
+          <span style="color:var(--text-muted); white-space:nowrap;">${l.timestamp}</span>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function connectOllama() {
+      const url = document.getElementById('ollamaUrlInput').value;
+      const res = await fetch('/api/ollama/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ollama_url: url })
+      });
+      const data = await res.json();
+      appData = { state: data.state, ollama: data.ollama };
+      renderAll();
+    }
+
+    async function changeAgentModel(agentId, model) {
+      await fetch(`/api/agents/${agentId}/model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
+      loadState();
+    }
+
+    async function createTicket() {
+      const title = document.getElementById('tckTitle').value.trim();
+      const desc = document.getElementById('tckDesc').value.trim();
+      const assigned_to = document.getElementById('tckAgent').value;
+      const priority = document.getElementById('tckPriority').value;
+      if (!title) { alert('Please enter a ticket title'); return; }
+
+      const btn = document.getElementById('submitTicketBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Agent Reasoning via Ollama (192.168.0.17)...';
+      try {
+        await fetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description: desc, assigned_to, priority, auto_execute: true })
+        });
+        document.getElementById('tckTitle').value = '';
+        document.getElementById('tckDesc').value = '';
+        await loadState();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Dispatch & Execute via Ollama (192.168.0.17)';
+      }
+    }
+
+    async function approveTicket(tckId) {
+      await fetch(`/api/tickets/${tckId}/approve`, { method: 'POST' });
+      loadState();
+    }
+
+    let libraryCatalog = [];
+    let pullPollTimer = null;
+
+    async function loadOllamaLibrary() {
+      const q = (document.getElementById('hubSearchInput')?.value || '').trim();
+      const res = await fetch(`/api/ollama/library?sort=popular&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      libraryCatalog = data.models || [];
+      renderLibraryModels(libraryCatalog);
+      renderActivePulls(data.active_pulls || []);
+    }
+
+    function filterLibraryModels() {
+      const q = (document.getElementById('hubSearchInput')?.value || '').toLowerCase().trim();
+      if (!q) {
+        renderLibraryModels(libraryCatalog);
+        return;
+      }
+      const filtered = libraryCatalog.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.description || '').toLowerCase().includes(q) ||
+        (m.capabilities || []).some(c => c.toLowerCase().includes(q))
+      );
+      renderLibraryModels(filtered);
+    }
+
+    function renderLibraryModels(models) {
+      const grid = document.getElementById('hubLibraryGrid');
+      if (!grid) return;
+      grid.innerHTML = models.map(m => {
+        const sizeOpts = (m.sizes || ['latest']).map(s =>
+          `<option value="${s}" ${s === m.default_tag ? 'selected' : ''}>${m.name}:${s}</option>`
+        ).join('');
+        const installedBadge = m.is_installed
+          ? `<span class="badge" style="color:#34d399; border-color:#10b981;">✓ Installed (${(m.installed_variants || []).join(', ')})</span>`
+          : `<span class="badge">⬇ ${m.pulls || 'Popular'} Pulls</span>`;
+        return `
+          <div class="model-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                <a href="https://ollama.com/library/${m.name}" target="_blank" style="font-size:15px; font-weight:800; color:#38bdf8; font-family:monospace; text-decoration:none;">
+                  ${m.name} ↗
+                </a>
+                ${installedBadge}
+              </div>
+              <div style="font-size:12.5px; color:var(--text-sub); line-height:1.45; margin-bottom:10px;">
+                ${escapeHtml(m.description || '')}
+              </div>
+              <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px;">
+                ${(m.capabilities || []).map(c => `<span class="badge">${c}</span>`).join('')}
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+              <select id="tag-${m.name}" class="select-box" style="flex:1; font-family:monospace; font-size:12px;">
+                ${sizeOpts}
+              </select>
+              <button class="btn btn-primary" onclick="pullHubModel('${m.name}')">
+                ⬇️ Download
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function pullHubModel(modelBase) {
+      const sel = document.getElementById(`tag-${modelBase}`);
+      const tag = sel ? sel.value : 'latest';
+      const fullTag = `${modelBase}:${tag}`;
+      await startModelPull(fullTag);
+    }
+
+    async function pullCustomModel() {
+      const inp = document.getElementById('customPullInput');
+      const val = (inp?.value || '').trim();
+      if (!val) {
+        alert('Enter a model name from ollama.com/library (e.g. llama3.2:3b)');
+        return;
+      }
+      inp.value = '';
+      await startModelPull(val);
+    }
+
+    async function startModelPull(modelTag) {
+      await fetch('/api/ollama/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelTag })
+      });
+      await pollActivePulls();
+      if (!pullPollTimer) {
+        pullPollTimer = setInterval(pollActivePulls, 2000);
+      }
+    }
+
+    async function pollActivePulls() {
+      try {
+        const res = await fetch('/api/ollama/pulls');
+        const data = await res.json();
+        const pulls = data.pulls || [];
+        renderActivePulls(pulls);
+        const anyRunning = pulls.some(p => !p.done);
+        if (!anyRunning && pullPollTimer) {
+          clearInterval(pullPollTimer);
+          pullPollTimer = null;
+          await loadState();
+          await loadOllamaLibrary();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderActivePulls(pulls) {
+      const box = document.getElementById('activePullsContainer');
+      if (!box) return;
+      if (!pulls || pulls.length === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+      }
+      box.style.display = 'block';
+      box.innerHTML = pulls.map(p => {
+        const compGb = (p.completed_bytes / (1024 ** 3)).toFixed(2);
+        const totGb = (p.total_bytes / (1024 ** 3)).toFixed(2);
+        const barColor = p.error ? '#ef4444' : (p.done ? '#10b981' : '#0ea5e9');
+        const info = p.error
+          ? `Error: ${escapeHtml(p.error)}`
+          : `${p.status} • ${p.percent}% (${compGb} / ${totGb} GB) • ${p.speed_mbps || 0} MB/s`;
+        return `
+          <div style="background:#050811; border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-top:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:monospace; margin-bottom:6px;">
+              <strong style="color:#38bdf8;">⬇️ ${p.model}</strong>
+              <span style="color:var(--text-sub);">${info}</span>
+            </div>
+            <div style="width:100%; height:8px; background:#1e293b; border-radius:999px; overflow:hidden;">
+              <div style="width:${Math.min(100, p.percent || 5)}%; height:100%; background:${barColor}; transition:width 0.4s;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteModel(modelName) {
+      if (!confirm(`Delete model '${modelName}' from Ollama server?`)) return;
+      await fetch('/api/ollama/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName })
+      });
+      await loadState();
+      await loadOllamaLibrary();
+    }
+
+    loadState();
+    loadOllamaLibrary();
+  </script>
+</body>
+
+</html>
