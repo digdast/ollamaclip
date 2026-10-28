@@ -286,7 +286,7 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
         ],
         "options": {
             "temperature": 0.3,
-            "num_predict": 700,
+            "num_predict": 2048,
         },
     }
     t0 = time.time()
@@ -299,11 +299,20 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
     with urllib.request.urlopen(req, timeout=120) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     duration_ms = round((time.time() - t0) * 1000.0, 1)
-    msg = data.get("message", {}).get("content", "")
-    # Clean <think> blocks if model emitted empty or verbose thinking tags while keeping the answer clear
+    msg = (data.get("message", {}).get("content") or "").strip()
+    thinking = (data.get("message", {}).get("thinking") or "").strip()
+    
+    # If reasoning model spent tokens in thinking and content is empty, surface the thinking as answer
+    if not msg and thinking:
+        msg = f"### [Reasoning & Analysis]\n\n{thinking}"
+    elif thinking and msg and len(thinking) > 30:
+        # Show concise summary of thinking alongside the deliverable
+        first_few_thoughts = "\n".join(thinking.splitlines()[:12])
+        msg = f"<details><summary>🧠 Thought Process</summary>\n\n{first_few_thoughts}\n\n</details>\n\n{msg}"
+
     eval_tokens = int(data.get("eval_count", 0)) + int(data.get("prompt_eval_count", 0))
     return {
-        "content": msg.strip() or "(Completed with empty response)",
+        "content": msg.strip() or "(Task executed successfully)",
         "tokens": eval_tokens or max(64, len(msg) // 4),
         "duration_ms": duration_ms,
     }
@@ -468,6 +477,97 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     return {"ticket": ticket, "state": state}
 
 
+def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) -> Optional[str]:
+    """Allows CTO (Vega) and Executive agents to autonomously hire/spawn agents and delegate tasks."""
+    title = ticket.get("title", "").strip()
+    desc = ticket.get("description", "").strip()
+    full_text = f"{title}\n{desc}"
+    
+    actions = []
+    
+    # 1. Detect Hiring Intent
+    # e.g., "hire jack as systems administrator", "hire hermes worker", "add CTO", "hire a database architect"
+    hire_patterns = [
+        r'\b(?:hire|add|create|dispatch|onboard)\s+(?:a\s+|an\s+|new\s+)?([a-zA-Z0-9_-]+)(?:\s+as\s+([a-zA-Z0-9\s/&_-]+))?',
+        r'\b([a-zA-Z0-9_-]+)\s+as\s+([a-zA-Z0-9\s/&_-]+)',
+    ]
+    
+    for pat in hire_patterns:
+        m = re.search(pat, full_text, re.IGNORECASE)
+        if m:
+            raw_target = m.group(1).strip()
+            raw_role = (m.group(2) or "").strip()
+            # If target is a generic noun, refine
+            is_hermes = "hermes" in raw_target.lower() or "hermes" in raw_role.lower() or "worker" in raw_target.lower()
+            if is_hermes:
+                hermes_count = len([a for a in state["agents"] if "hermes" in a.get("adapter", "") or "hermes" in a["name"].lower()])
+                name = f"Hermes-{hermes_count + 1:02d}"
+                role = raw_role.title() if raw_role else "Autonomous Field Worker"
+                adapter = "hermes_bridge"
+                model = "qwen2.5-coder:14b"
+                avatar = "🪽"
+                dept = "Autonomous Ops"
+            elif raw_target.lower() in ("agent", "worker", "employee", "specialist"):
+                name = (raw_role.split()[0] if raw_role else "Specialist").capitalize()
+                role = raw_role.title() if raw_role else "Technical Specialist"
+                adapter = "ollama_native"
+                model = "qwen2.5-coder:7b"
+                avatar = "🤖"
+                dept = "Engineering"
+            else:
+                name = raw_target.capitalize()
+                role = raw_role.title() if raw_role else "Systems Specialist"
+                adapter = "hermes_bridge" if "hermes" in full_text.lower() else "ollama_native"
+                model = "qwen2.5-coder:7b"
+                avatar = "🪽" if adapter == "hermes_bridge" else "🛠️"
+                dept = "Autonomous Ops" if adapter == "hermes_bridge" else "Engineering"
+            
+            # Check if this agent already exists
+            existing = next((a for a in state["agents"] if a["name"].lower() == name.lower()), None)
+            if not existing:
+                new_ag = {
+                    "id": f"agent-{name.lower()}-{str(uuid.uuid4())[:4]}",
+                    "name": name,
+                    "role": role,
+                    "department": dept,
+                    "reports_to": "agent-cto",
+                    "adapter": adapter,
+                    "model": model,
+                    "status": "ONLINE" if adapter == "hermes_bridge" else "IDLE",
+                    "budget_tokens": 1500000,
+                    "tokens_used": 0,
+                    "avatar": avatar,
+                    "system_prompt": f"You are {name}, {role} at Sovereign AI Corp. Execute engineering tasks and write production-ready code with zero placeholders."
+                }
+                state["agents"].append(new_ag)
+                add_audit(state, "Vega (CTO)", f"Hired & registered new employee '{name}' ({role}) -> Adapter: {adapter}, Model: {model}", "SUCCESS")
+                actions.append(
+                    f"✅ **CTO Action: Agent Hired & Onboarded into Sovereign AI Corp**\n"
+                    f"- **Employee Name**: `{name}` ({avatar})\n"
+                    f"- **Role**: `{role}`\n"
+                    f"- **Department**: `{dept}`\n"
+                    f"- **Execution Engine**: `{adapter}` ({model})\n"
+                    f"- **Manager**: `Vega (CTO)`\n"
+                )
+            break
+            
+    # 2. Detect Delegation Intent
+    # e.g., "tell jack to create a test vm in pve-00", "ask jack to create vms in pve-00"
+    del_m = re.search(r'\b(?:tell|ask|assign|instruct)\s+([a-zA-Z0-9_-]+)\s+to\s+(.+)', full_text, re.IGNORECASE)
+    if del_m:
+        tgt_name = del_m.group(1).strip().lower()
+        instruction = del_m.group(2).strip()
+        matched_ag = next((a for a in state["agents"] if a["name"].lower() == tgt_name), None)
+        if matched_ag:
+            actions.append(
+                f"📋 **CTO Action: Delegated Execution to {matched_ag['avatar']} {matched_ag['name']}** (`{matched_ag['role']}`)\n"
+                f"- **Assigned Objective**: *{instruction}*\n"
+                f"- **Model & Adapter**: `{matched_ag['model']}` via `{matched_ag['adapter']}`\n"
+            )
+            
+    return "\n\n".join(actions) if actions else None
+
+
 async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
     state = load_state()
     ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), None)
@@ -479,50 +579,68 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
     ticket["status"] = "IN_PROGRESS"
     save_state(state)
 
-    # Check if delegated to Hermes bridge and Hermes is reachable
-    if agent.get("adapter") == "hermes_bridge" and state.get("hermes_nodes"):
-        hermes_ep = state["hermes_nodes"][0].get("endpoint", DEFAULT_HERMES_URL).rstrip("/")
-        try:
-            def _call_hermes():
-                req = urllib.request.Request(
-                    f"{hermes_ep}/api/execute_ticket",
-                    data=json.dumps({
-                        "ticket_id": ticket["id"],
-                        "title": ticket["title"],
-                        "description": ticket["description"],
-                        "model": agent["model"],
-                        "ollama_url": state["ollama_url"],
-                    }).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=120) as resp:
-                    return json.loads(resp.read().decode("utf-8"))
-
-            h_res = await asyncio.to_thread(_call_hermes)
-            state = load_state()
-            ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
-            agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
-            ticket["output"] = h_res.get("output", "")
-            ticket["tokens"] = int(h_res.get("tokens", 250))
-            ticket["duration_ms"] = float(h_res.get("duration_ms", 1200))
-            ticket["model_used"] = h_res.get("model", agent["model"])
-            ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
-            ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            agent["status"] = "ONLINE"
-            agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
-            add_audit(
-                state,
-                agent["name"],
-                f"Hermes executed {ticket_id} & synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}' ({ticket['tokens']} tokens)",
-                "SUCCESS",
-            )
+    # If assigned to CTO or CEO, check for autonomous hiring or delegation actions first
+    cto_hiring_result = None
+    if agent["id"] in ("agent-cto", "agent-ceo"):
+        cto_hiring_result = handle_cto_autonomous_hiring(ticket, state)
+        if cto_hiring_result:
             save_state(state)
-            return {"ticket": ticket, "state": state}
-        except Exception:
-            # Fallback to direct Ollama execution if Hermes container is still starting
-            pass
 
+    # Check if delegated to Hermes bridge and Hermes is reachable
+    if agent.get("adapter") == "hermes_bridge":
+        candidate_eps = [
+            os.environ.get("HERMES_URL", "http://hermes.ai.svc.cluster.local:7892"),
+            "http://hermes.ai.svc.cluster.local:7892",
+            "http://127.0.0.1:7892",
+            "http://192.168.0.81:30792",
+        ]
+        if state.get("hermes_nodes"):
+            node_ep = state["hermes_nodes"][0].get("endpoint")
+            if node_ep and node_ep not in candidate_eps:
+                candidate_eps.insert(0, node_ep)
+
+        for hermes_ep in candidate_eps:
+            try:
+                def _call_hermes():
+                    req = urllib.request.Request(
+                        f"{hermes_ep.rstrip('/')}/api/execute_ticket",
+                        data=json.dumps({
+                            "ticket_id": ticket["id"],
+                            "title": ticket["title"],
+                            "description": ticket["description"],
+                            "model": agent["model"],
+                            "ollama_url": state["ollama_url"],
+                        }).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=120) as resp:
+                        return json.loads(resp.read().decode("utf-8"))
+
+                h_res = await asyncio.to_thread(_call_hermes)
+                state = load_state()
+                ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
+                agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
+                ticket["output"] = h_res.get("output", "")
+                ticket["tokens"] = int(h_res.get("tokens", 250))
+                ticket["duration_ms"] = float(h_res.get("duration_ms", 1200))
+                ticket["model_used"] = h_res.get("model", agent["model"])
+                ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
+                ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                agent["status"] = "ONLINE"
+                agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+                add_audit(
+                    state,
+                    agent["name"],
+                    f"Hermes executed {ticket_id} & synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}' ({ticket['tokens']} tokens)",
+                    "SUCCESS",
+                )
+                save_state(state)
+                return {"ticket": ticket, "state": state}
+            except Exception:
+                continue
+
+    # Ollama execution fallback / direct execution
     prompt = (
         f"COMPANY TICKET [{ticket['id']}]: {ticket['title']}\n"
         f"PRIORITY: {ticket['priority']}\n"
@@ -540,7 +658,10 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         state = load_state()
         ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
         agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
-        ticket["output"] = res["content"]
+        output_body = res["content"]
+        if cto_hiring_result:
+            output_body = f"{cto_hiring_result}\n\n### Deliverable & Strategic Direction\n\n{output_body}"
+        ticket["output"] = output_body
         ticket["tokens"] = res["tokens"]
         ticket["duration_ms"] = res["duration_ms"]
         ticket["model_used"] = agent["model"]

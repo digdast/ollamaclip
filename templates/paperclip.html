@@ -462,6 +462,7 @@
       <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
       <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
       <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
+      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678) ↗</button>
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
@@ -489,7 +490,12 @@
         <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
           value="http://192.168.0.17:11434" />
         <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
-        <button class="btn" style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);" onclick="openDispatchAgentStudio()">🤖 + Dispatch New Agent</button>
+        <button class="btn"
+          style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
+          onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
+        <button class="btn"
+          style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
+          onclick="openDispatchAgentStudio()">🤖 + Dispatch Agent</button>
         <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
           Agent UI</a>
       </div>
@@ -513,7 +519,13 @@
             onclick="switchTab('control', document.querySelectorAll('.tab-btn')[1])">
             🚀 Launch Paperclip Control Plane
           </button>
-          <button class="btn" style="padding:12px 22px; font-size:14px; border-color:rgba(168,85,247,0.55); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
+          <button class="btn"
+            style="padding:12px 22px; font-size:14px; border-color:rgba(56,189,248,0.55); background:linear-gradient(135deg,#0284c7,#0d9488);"
+            onclick="openDispatchHermesWorker()">
+            🪽 Dispatch Hermes Worker
+          </button>
+          <button class="btn"
+            style="padding:12px 22px; font-size:14px; border-color:rgba(168,85,247,0.55); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
             onclick="openDispatchAgentStudio()">
             🤖 Dispatch New AI Agent
           </button>
@@ -524,6 +536,10 @@
           <a class="btn" style="padding:12px 22px; font-size:14px;" id="heroHermesLink" href="http://192.168.0.81:30792"
             target="_blank">
             🪽 Launch Hermes Agent Console
+          </a>
+          <a class="btn" style="padding:12px 22px; font-size:14px; border-color:rgba(245,158,11,0.5); background:linear-gradient(135deg,#d97706,#b45309);"
+            href="http://192.168.0.81:30678" target="_blank">
+            ⚡ Open n8n Workflows
           </a>
         </div>
       </div>
@@ -576,39 +592,56 @@
     <section class="view-section" id="view-control">
       <div class="sec-hdr">
         <h2>🏢 AI Company Org Chart — Click Model Dropdown to Reassign Ollama Model</h2>
-        <button class="btn btn-primary" onclick="toggleAgentStudio()">🤖 + Dispatch / Spawn New AI Agent</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn" style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);" onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
+          <button class="btn" style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);" onclick="toggleAgentStudio()">🤖 + Dispatch Agent</button>
+          <button class="btn" style="border-color:rgba(245,158,11,0.5); background:rgba(245,158,11,0.15); color:#fbbf24;" onclick="askCtoToHire()">💼 Ask CTO to Hire</button>
+        </div>
       </div>
 
       <!-- DISPATCH / SPAWN NEW AI AGENT STUDIO -->
-      <div class="panel" id="dispatchAgentStudio" style="margin-bottom:22px; border-color:var(--border-glow); background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,27,75,0.65));">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div class="panel" id="dispatchAgentStudio"
+        style="margin-bottom:22px; border-color:var(--border-glow); background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,27,75,0.65));">
+        <div
+          style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
           <div>
             <h3 style="font-size:16px; display:flex; align-items:center; gap:8px;">
               <span>🤖 Dispatch & Spawn New Autonomous AI Agent</span>
-              <span class="badge" style="color:#c084fc; border-color:rgba(168,85,247,0.45);">Ollama + Hermes Ready</span>
+              <span class="badge" style="color:#c084fc; border-color:rgba(168,85,247,0.45);">Ollama + Hermes
+                Ready</span>
             </h3>
             <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
-              Choose a 1-click specialist blueprint or customize a new AI employee connected to local Ollama (<code>192.168.0.17:11434</code>) or Hermes Bridge (<code>30792</code>).
+              Choose a 1-click specialist blueprint or customize a new AI employee connected to local Ollama
+              (<code>192.168.0.17:11434</code>) or Hermes Bridge (<code>30792</code>).
             </div>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sre')">🛠️ K3s & DevOps SRE</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('research')">🔬 Deep Researcher</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('hermes')">🪽 Hermes Field Worker</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('db')">🗄️ Storage & DB Architect</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('ui')">🎨 Frontend & UI Engineer</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sec')">🛡️ Red-Team SecOps</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sre')">🛠️ K3s &
+              DevOps SRE</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('research')">🔬
+              Deep Researcher</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('hermes')">🪽
+              Hermes Field Worker</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('db')">🗄️ Storage
+              & DB Architect</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('ui')">🎨 Frontend
+              & UI Engineer</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('sec')">🛡️
+              Red-Team SecOps</button>
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-bottom:12px;">
+        <div
+          style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-bottom:12px;">
           <div class="field" style="margin-bottom:0;">
             <label>Agent Name / Callsign</label>
-            <input type="text" id="newAgentName" class="input-box" placeholder="e.g., Nexus, Nova, Hermes-02" value="Nexus" />
+            <input type="text" id="newAgentName" class="input-box" placeholder="e.g., Nexus, Nova, Hermes-02"
+              value="Nexus" />
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Role / Job Title</label>
-            <input type="text" id="newAgentRole" class="input-box" placeholder="e.g., Principal Kubernetes SRE" value="Principal Kubernetes & Infra SRE" />
+            <input type="text" id="newAgentRole" class="input-box" placeholder="e.g., Principal Kubernetes SRE"
+              value="Principal Kubernetes & Infra SRE" />
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Department</label>
@@ -661,11 +694,13 @@
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
           <div class="field" style="margin-bottom:0;">
             <label>Agent System Prompt / Persona Instructions</label>
-            <textarea id="newAgentPrompt" rows="3" placeholder="Define the agent's expertise, constraints, and output style...">You are Nexus, Principal Kubernetes & Infrastructure SRE at Sovereign AI Corp. Write production-ready K3s manifests, Proxmox automation scripts, and high-availability runbooks with zero placeholders.</textarea>
+            <textarea id="newAgentPrompt" rows="3"
+              placeholder="Define the agent's expertise, constraints, and output style...">You are Nexus, Principal Kubernetes & Infrastructure SRE at Sovereign AI Corp. Write production-ready K3s manifests, Proxmox automation scripts, and high-availability runbooks with zero placeholders.</textarea>
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Optional Initial Mission / Task to Execute Immediately upon Dispatch</label>
-            <textarea id="newAgentInitialTask" rows="3" placeholder="(Optional) Enter an initial task here to immediately run a ticket with this newly dispatched agent via Ollama..."></textarea>
+            <textarea id="newAgentInitialTask" rows="3"
+              placeholder="(Optional) Enter an initial task here to immediately run a ticket with this newly dispatched agent via Ollama..."></textarea>
           </div>
         </div>
 
@@ -1064,6 +1099,43 @@
         studio.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       document.getElementById('newAgentName')?.focus();
+    }
+
+    function openDispatchHermesWorker() {
+      openDispatchAgentStudio();
+      const hermesCount = (appData?.state?.agents || []).filter(a => (a.adapter || '').includes('hermes') || (a.name || '').toLowerCase().includes('hermes')).length;
+      const nextNum = String(hermesCount + 1).padStart(2, '0');
+      document.getElementById('newAgentName').value = `Hermes-${nextNum}`;
+      document.getElementById('newAgentRole').value = 'Autonomous Self-Improving Field Worker';
+      document.getElementById('newAgentDept').value = 'Autonomous Ops';
+      document.getElementById('newAgentAvatar').value = '🪽';
+      document.getElementById('newAgentAdapter').value = 'hermes_bridge';
+      document.getElementById('newAgentPrompt').value = `You are Hermes-${nextNum}, an autonomous self-improving field worker connected to Paperclip Control Plane and Ollama. Execute engineering tasks, extract reusable skills into your vault, and maintain episodic memory.`;
+      const modelSel = document.getElementById('newAgentModel');
+      if (modelSel) {
+        if (Array.from(modelSel.options).some(o => o.value === 'qwen2.5-coder:14b')) {
+          modelSel.value = 'qwen2.5-coder:14b';
+        } else if (Array.from(modelSel.options).some(o => o.value === 'qwen2.5-coder:7b')) {
+          modelSel.value = 'qwen2.5-coder:7b';
+        }
+      }
+    }
+
+    function askCtoToHire() {
+      switchTab('control', document.querySelectorAll('.tab-btn')[1]);
+      const cto = (appData?.state?.agents || []).find(a => a.id === 'agent-cto');
+      const ctoId = cto ? cto.id : (appData?.state?.agents || [])[0]?.id;
+      const tckAgent = document.getElementById('tckAgent');
+      if (tckAgent && ctoId) tckAgent.value = ctoId;
+      
+      const tckTitle = document.getElementById('tckTitle');
+      const tckDesc = document.getElementById('tckDesc');
+      if (tckTitle && tckDesc) {
+        tckTitle.value = 'Hire Jack as Systems Administrator and create test VM in pve-00';
+        tckDesc.value = 'Vega (CTO), please onboard Jack as our new Systems Administrator with full access to Proxmox pve-00 and have him execute a test VM deployment.';
+        tckTitle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        tckTitle.focus();
+      }
     }
 
     function toggleAgentStudio() {

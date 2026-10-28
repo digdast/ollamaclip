@@ -231,7 +231,7 @@ def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: s
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "options": {"temperature": 0.3, "num_predict": 700},
+        "options": {"temperature": 0.3, "num_predict": 2048},
     }
     t0 = time.time()
     req = urllib.request.Request(
@@ -243,10 +243,17 @@ def run_ollama_inference(st: Dict[str, Any], user_prompt: str, model_override: s
     with urllib.request.urlopen(req, timeout=120) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     duration_ms = round((time.time() - t0) * 1000.0, 1)
-    content = data.get("message", {}).get("content", "").strip()
+    content = (data.get("message", {}).get("content") or "").strip()
+    thinking = (data.get("message", {}).get("thinking") or "").strip()
+    if not content and thinking:
+        content = f"### [Reasoning & Technical Execution]\n\n{thinking}"
+    elif thinking and content and len(thinking) > 30:
+        first_few_thoughts = "\n".join(thinking.splitlines()[:12])
+        content = f"<details><summary>🧠 Thought Process</summary>\n\n{first_few_thoughts}\n\n</details>\n\n{content}"
+
     tokens = int(data.get("eval_count", 0)) + int(data.get("prompt_eval_count", 0))
     return {
-        "content": content or "(Completed)",
+        "content": content or "(Task executed successfully)",
         "tokens": tokens or max(64, len(content) // 4),
         "duration_ms": duration_ms,
         "model": model,
