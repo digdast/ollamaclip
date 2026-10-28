@@ -154,6 +154,17 @@ def default_state() -> Dict[str, Any]:
         ],
         "hermes_nodes": [
             {
+                "node_id": "hermes-host-17",
+                "name": "Hermes-GPU (plexadmin@192.168.0.17)",
+                "endpoint": "http://192.168.0.17:7892",
+                "ollama_url": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:14b",
+                "skills_count": 4,
+                "memories_count": 6,
+                "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "CONNECTED",
+            },
+            {
                 "node_id": "hermes-k3s-primary",
                 "name": "Hermes-01 (K3s Autonomous Worker)",
                 "endpoint": DEFAULT_HERMES_URL,
@@ -165,6 +176,7 @@ def default_state() -> Dict[str, Any]:
                 "status": "CONNECTED",
             }
         ],
+        "active_hermes_node_id": "hermes-host-17",
         "hermes_ticket_logs": [
             {
                 "id": "hlog-init-101",
@@ -211,7 +223,44 @@ def load_state() -> Dict[str, Any]:
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                st = json.load(f)
+            
+            # Ensure hermes-host-17 is in hermes_nodes
+            node_ids = {n.get("node_id") for n in st.get("hermes_nodes", [])}
+            if "hermes-host-17" not in node_ids:
+                st.setdefault("hermes_nodes", []).insert(0, {
+                    "node_id": "hermes-host-17",
+                    "name": "Hermes-GPU (plexadmin@192.168.0.17)",
+                    "endpoint": "http://192.168.0.17:7892",
+                    "ollama_url": "http://127.0.0.1:11434",
+                    "model": "qwen2.5-coder:14b",
+                    "skills_count": 4,
+                    "memories_count": 6,
+                    "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "CONNECTED",
+                })
+            if not st.get("active_hermes_node_id"):
+                st["active_hermes_node_id"] = "hermes-host-17"
+            
+            # Ensure Hermes-17 agent exists in agents
+            agent_ids = {a.get("id") for a in st.get("agents", [])}
+            if "agent-hermes-17" not in agent_ids:
+                st.setdefault("agents", []).append({
+                    "id": "agent-hermes-17",
+                    "name": "Hermes-17",
+                    "role": "Host Autonomous GPU Worker (192.168.0.17)",
+                    "department": "Autonomous Ops",
+                    "reports_to": "agent-cto",
+                    "adapter": "hermes_bridge",
+                    "endpoint": "http://192.168.0.17:7892",
+                    "model": "qwen2.5-coder:14b",
+                    "status": "ONLINE",
+                    "budget_tokens": 2000000,
+                    "tokens_used": 0,
+                    "avatar": "🪽",
+                    "system_prompt": "You are Hermes-17, an autonomous self-improving agent running directly on the GPU host at 192.168.0.17. Execute tickets with low latency and synthesize reusable skills."
+                })
+            return st
         except Exception:
             pass
     st = default_state()
@@ -611,16 +660,30 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
 
     # Check if delegated to Hermes bridge and Hermes is reachable
     if agent.get("adapter") == "hermes_bridge":
-        candidate_eps = [
+        candidate_eps = []
+        if agent.get("endpoint"):
+            candidate_eps.append(agent["endpoint"])
+            
+        active_id = state.get("active_hermes_node_id")
+        active_node = next((n for n in state.get("hermes_nodes", []) if n.get("node_id") == active_id), None)
+        if active_node and active_node.get("endpoint") and active_node["endpoint"] not in candidate_eps:
+            candidate_eps.append(active_node["endpoint"])
+            
+        for n in state.get("hermes_nodes", []):
+            ep = n.get("endpoint")
+            if ep and ep not in candidate_eps:
+                candidate_eps.append(ep)
+                
+        fallback_eps = [
+            "http://192.168.0.17:7892",
             os.environ.get("HERMES_URL", "http://hermes.ai.svc.cluster.local:7892"),
             "http://hermes.ai.svc.cluster.local:7892",
-            "http://127.0.0.1:7892",
             "http://192.168.0.81:30792",
+            "http://127.0.0.1:7892",
         ]
-        if state.get("hermes_nodes"):
-            node_ep = state["hermes_nodes"][0].get("endpoint")
-            if node_ep and node_ep not in candidate_eps:
-                candidate_eps.insert(0, node_ep)
+        for f_ep in fallback_eps:
+            if f_ep not in candidate_eps:
+                candidate_eps.append(f_ep)
 
         for hermes_ep in candidate_eps:
             try:
@@ -654,6 +717,9 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                 agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
                 
                 # Attach rich Hermes Ticket Completion Log
+                matching_node = next((n for n in state.get("hermes_nodes", []) if n.get("endpoint") == hermes_ep), None)
+                matched_node_id = matching_node["node_id"] if matching_node else state.get("active_hermes_node_id", "hermes-host-17")
+
                 c_log = h_res.get("completion_log")
                 if not c_log:
                     elapsed_s = max(0.1, round(ticket["duration_ms"] / 1000.0, 2))
@@ -662,7 +728,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         "ticket_id": ticket_id,
                         "title": ticket["title"],
                         "agent_name": agent["name"],
-                        "node_id": "hermes-k3s-primary",
+                        "node_id": matched_node_id,
                         "model": ticket["model_used"],
                         "tokens": ticket["tokens"],
                         "tok_per_sec": round(ticket["tokens"] / elapsed_s, 1),
@@ -678,6 +744,8 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         ],
                         "status": "SUCCESS",
                     }
+                else:
+                    c_log["node_id"] = matched_node_id
                 ticket["hermes_log"] = c_log
                 state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
                 state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
@@ -823,6 +891,131 @@ async def get_hermes_ticket_completion_logs():
             logs.append(hl)
             seen_ids.add(hl["id"])
     return {"logs": logs, "count": len(logs)}
+
+
+@app.get("/api/hermes/nodes")
+async def get_hermes_nodes():
+    state = load_state()
+    return {
+        "nodes": state.get("hermes_nodes", []),
+        "active_node_id": state.get("active_hermes_node_id", "hermes-host-17"),
+        "agents": [a for a in state["agents"] if a.get("adapter") == "hermes_bridge"]
+    }
+
+
+@app.post("/api/hermes/nodes/select")
+async def select_hermes_node(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    node_id = payload.get("node_id")
+    if not node_id:
+        raise HTTPException(status_code=400, detail="node_id is required")
+    
+    target_node = next((n for n in state.get("hermes_nodes", []) if n["node_id"] == node_id), None)
+    if not target_node:
+        raise HTTPException(status_code=404, detail="Hermes node not found")
+        
+    state["active_hermes_node_id"] = node_id
+    add_audit(state, "Control Plane", f"Switched active Hermes agent connection to '{target_node['name']}' ({target_node['endpoint']})", "INFO")
+    save_state(state)
+    return {"ok": True, "active_node_id": node_id, "node": target_node, "state": state}
+
+
+@app.post("/api/hermes/nodes/connect")
+async def connect_custom_hermes_node(payload: Dict[str, Any] = Body(...)):
+    endpoint = payload.get("endpoint", "").strip().rstrip("/")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Agent endpoint URL is required (e.g. http://192.168.0.17:7892)")
+    
+    if not (endpoint.startswith("http://") or endpoint.startswith("https://")):
+        endpoint = f"http://{endpoint}"
+        
+    probe_url = f"{endpoint}/api/state"
+    remote_data = {}
+    try:
+        def _probe():
+            req = urllib.request.Request(probe_url, headers={"User-Agent": "Paperclip-Probe/1.0"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        remote_data = await asyncio.to_thread(_probe)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to probe agent endpoint at {endpoint}: {exc}")
+
+    state = load_state()
+    raw_node_id = payload.get("node_id") or remote_data.get("node_id") or f"hermes-{str(uuid.uuid4())[:6]}"
+    node_id = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_node_id).lower()
+    
+    host_label = urllib.parse.urlparse(endpoint).netloc or endpoint
+    node_name = payload.get("name") or remote_data.get("agent_name") or f"Hermes ({host_label})"
+    remote_model = remote_data.get("model") or "qwen2.5-coder:14b"
+    skills_count = len(remote_data.get("skills", []))
+    memories_count = len(remote_data.get("episodic_memories", []))
+    
+    node_info = {
+        "node_id": node_id,
+        "name": node_name,
+        "endpoint": endpoint,
+        "ollama_url": remote_data.get("ollama_url", state["ollama_url"]),
+        "model": remote_model,
+        "skills_count": skills_count,
+        "memories_count": memories_count,
+        "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "CONNECTED",
+    }
+    
+    existing_idx = next((i for i, n in enumerate(state.get("hermes_nodes", [])) if n["node_id"] == node_id), None)
+    if existing_idx is not None:
+        state["hermes_nodes"][existing_idx] = node_info
+    else:
+        state.setdefault("hermes_nodes", []).append(node_info)
+        
+    state["active_hermes_node_id"] = node_id
+    
+    agent_id = f"agent-{node_id}"
+    agent_found = next((a for a in state["agents"] if a["id"] == agent_id or a.get("endpoint") == endpoint), None)
+    if not agent_found:
+        state["agents"].append({
+            "id": agent_id,
+            "name": node_name.split("(")[0].strip() or "Hermes Custom",
+            "role": f"Remote Autonomous Worker ({host_label})",
+            "department": "Autonomous Ops",
+            "reports_to": "agent-cto",
+            "adapter": "hermes_bridge",
+            "endpoint": endpoint,
+            "model": remote_model,
+            "status": "ONLINE",
+            "budget_tokens": 2000000,
+            "tokens_used": 0,
+            "avatar": "🪽",
+            "system_prompt": f"You are an autonomous agent connected via {endpoint}. Execute tickets and synthesize reusable skills."
+        })
+    else:
+        agent_found["endpoint"] = endpoint
+        agent_found["status"] = "ONLINE"
+        agent_found["model"] = remote_model
+
+    add_audit(state, "Control Plane", f"Connected new agent node '{node_name}' at {endpoint} (Model: {remote_model}, Skills: {skills_count})", "SUCCESS")
+    save_state(state)
+    return {"ok": True, "node": node_info, "state": state}
+
+
+@app.delete("/api/hermes/nodes/{node_id}")
+async def unregister_hermes_node(node_id: str):
+    state = load_state()
+    nodes = state.get("hermes_nodes", [])
+    if len(nodes) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot remove the last active Hermes node")
+    
+    target = next((n for n in nodes if n["node_id"] == node_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Node not found")
+        
+    state["hermes_nodes"] = [n for n in nodes if n["node_id"] != node_id]
+    if state.get("active_hermes_node_id") == node_id:
+        state["active_hermes_node_id"] = state["hermes_nodes"][0]["node_id"]
+        
+    add_audit(state, "Control Plane", f"Unregistered agent node '{target['name']}' ({target['endpoint']})", "WARN")
+    save_state(state)
+    return {"ok": True, "removed": node_id, "state": state}
 
 
 # --- OLLAMA HUB LIBRARY (https://ollama.com/library?sort=popular) & 1-CLICK MODEL DOWNLOADER ---

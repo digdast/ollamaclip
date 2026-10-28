@@ -24,8 +24,11 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 HERMES_STATE_FILE = os.path.join(DATA_DIR, "hermes_state.json")
 DEFAULT_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.0.17:11434")
-DEFAULT_PAPERCLIP_URL = os.environ.get("PAPERCLIP_URL", "http://127.0.0.1:7891")
+DEFAULT_PAPERCLIP_URL = os.environ.get("PAPERCLIP_URL", "http://192.168.0.81:30791")
 DEFAULT_SELF_URL = os.environ.get("HERMES_SELF_URL", "http://127.0.0.1:7892")
+DEFAULT_NODE_ID = os.environ.get("NODE_ID", "hermes-k3s-primary")
+DEFAULT_AGENT_NAME = os.environ.get("AGENT_NAME", "Hermes-01")
+DEFAULT_MODEL_NAME = os.environ.get("DEFAULT_MODEL", "qwen2.5-coder:14b")
 
 app = FastAPI(
     title="Hermes-Ollama — Self-Improving Autonomous Agent",
@@ -35,12 +38,12 @@ app = FastAPI(
 
 def default_hermes_state() -> Dict[str, Any]:
     return {
-        "node_id": "hermes-k3s-primary",
-        "agent_name": "Hermes-01",
+        "node_id": DEFAULT_NODE_ID,
+        "agent_name": DEFAULT_AGENT_NAME,
         "ollama_url": DEFAULT_OLLAMA_URL,
         "paperclip_url": DEFAULT_PAPERCLIP_URL,
         "self_url": DEFAULT_SELF_URL,
-        "active_model": "qwen2.5-coder:7b",
+        "active_model": DEFAULT_MODEL_NAME,
         "paperclip_connected": True,
         "last_sync": time.strftime("%Y-%m-%d %H:%M:%S"),
         "tasks_completed": 3,
@@ -117,6 +120,14 @@ def load_hermes_state() -> Dict[str, Any]:
                 st = json.load(f)
             if os.environ.get("HERMES_SELF_URL"):
                 st["self_url"] = os.environ["HERMES_SELF_URL"]
+            if os.environ.get("NODE_ID"):
+                st["node_id"] = os.environ["NODE_ID"]
+            if os.environ.get("AGENT_NAME"):
+                st["agent_name"] = os.environ["AGENT_NAME"]
+            if os.environ.get("PAPERCLIP_URL"):
+                st["paperclip_url"] = os.environ["PAPERCLIP_URL"]
+            if os.environ.get("OLLAMA_URL"):
+                st["ollama_url"] = os.environ["OLLAMA_URL"]
             return st
         except Exception:
             pass

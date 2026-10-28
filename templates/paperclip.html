@@ -467,38 +467,73 @@
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
-    <div class="ollama-pill" id="ollamaStatusPill">
-      <span class="dot"></span>
-      <span id="ollamaStatusText">Ollama: Connecting...</span>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <div class="ollama-pill" id="ollamaStatusPill">
+        <span class="dot"></span>
+        <span id="ollamaStatusText">Ollama: Connecting...</span>
+      </div>
+      <div class="ollama-pill" id="agentStatusPill"
+        style="background:rgba(168,85,247,0.14); border-color:rgba(168,85,247,0.4); color:#c084fc;">
+        <span class="dot" style="background:#a855f7; box-shadow:0 0 8px #a855f7;"></span>
+        <span id="agentStatusText">Agent: Connecting...</span>
+      </div>
     </div>
   </header>
 
   <main class="container">
 
-    <!-- 1-CLICK OLLAMA CONNECTION BANNER (ALWAYS ACCESSIBLE) -->
+    <!-- 1-CLICK OLLAMA & AGENT CONNECTION BANNER (ALWAYS ACCESSIBLE) -->
     <div class="connect-bar">
-      <div>
-        <div style="font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;">
-          <span>⚡ 1-Click Dedicated Ollama Connector</span>
-          <span class="badge" id="discoveredModelsBadge">14 Models Ready</span>
+      <div
+        style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:14px;">
+        <div>
+          <div style="font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;">
+            <span>⚡ 1-Click Dedicated Ollama Connector</span>
+            <span class="badge" id="discoveredModelsBadge">14 Models Ready</span>
+          </div>
+          <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
+            Point Paperclip & Hermes at any local or LAN Ollama server — auto-discovers GGUF models, context windows &
+            capabilities.
+          </div>
         </div>
-        <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
-          Point Paperclip & Hermes at any local or LAN Ollama server — auto-discovers GGUF models, context windows &
-          capabilities.
+        <div class="connect-inputs">
+          <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
+            value="http://192.168.0.17:11434" />
+          <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
+          <button class="btn"
+            style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
+            onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
+          <button class="btn"
+            style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
+            onclick="openDispatchAgentStudio()">🤖 + Dispatch Agent</button>
+          <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
+            Agent UI</a>
         </div>
       </div>
-      <div class="connect-inputs">
-        <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
-          value="http://192.168.0.17:11434" />
-        <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
-        <button class="btn"
-          style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
-          onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
-        <button class="btn"
-          style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
-          onclick="openDispatchAgentStudio()">🤖 + Dispatch Agent</button>
-        <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
-          Agent UI</a>
+
+      <!-- DEDICATED AGENT CONNECTION DROPDOWN BAR -->
+      <div
+        style="display:flex; align-items:center; justify-content:space-between; width:100%; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:8px; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-size:13px; font-weight:700; color:#c084fc; display:flex; align-items:center; gap:6px;">
+            <span>🪽</span> Agent Connection:
+          </span>
+          <select id="agentNodeDropdown" class="select-box"
+            style="font-weight:600; min-width:340px; border-color:rgba(168,85,247,0.45); background:rgba(15,23,42,0.95);"
+            onchange="onSelectHermesNode(this.value)">
+            <!-- dynamically populated from st.hermes_nodes -->
+          </select>
+          <span class="badge" id="activeAgentNodeBadge" style="color:#a7f3d0; border-color:#059669;">Connected</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-emerald" style="padding:7px 14px; font-size:12px;" onclick="openConnectAgentModal()">
+            ➕ Connect Any Agent...
+          </button>
+          <a class="btn" id="activeAgentConsoleBtn" href="http://192.168.0.17:7892" target="_blank"
+            style="padding:7px 14px; font-size:12px; border-color:rgba(168,85,247,0.5); background:rgba(168,85,247,0.15); color:#c084fc;">
+            🪽 Open Active Agent Console ↗
+          </a>
+        </div>
       </div>
     </div>
 
@@ -811,9 +846,51 @@
     <!-- VIEW 4: HERMES BRIDGE -->
     <section class="view-section" id="view-hermes">
       <div class="sec-hdr">
-        <h2>🪽 Hermes Autonomous Self-Improving Worker Nodes</h2>
-        <button class="btn" style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);" onclick="openDispatchHermesWorker()">🪽 + Dispatch New Hermes Worker</button>
+        <div>
+          <h2>🪽 Hermes Autonomous Self-Improving Worker Nodes</h2>
+          <div style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">
+            Connect to any Hermes or custom agent node across your infrastructure (Debian GPU host
+            <code>192.168.0.17:7892</code>, K3s cluster <code>30792</code>, or custom endpoint).
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-emerald" onclick="openConnectAgentModal()">➕ Connect Any Agent Node...</button>
+          <button class="btn"
+            style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
+            onclick="openDispatchHermesWorker()">🪽 + Dispatch New Hermes Worker</button>
+        </div>
       </div>
+
+      <!-- CONNECT CUSTOM AGENT PANEL -->
+      <div class="panel" id="connectCustomAgentPanel"
+        style="margin-bottom:20px; display:none; border-color:rgba(168,85,247,0.5); background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(46,16,101,0.5));">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="font-size:15px; color:#c084fc; display:flex; align-items:center; gap:8px;">
+            <span>➕</span> Connect Custom Agent Endpoint (e.g. plexadmin@192.168.0.17)
+          </h3>
+          <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="closeConnectAgentModal()">✕
+            Close</button>
+        </div>
+        <p style="font-size:12.5px; color:var(--text-sub); margin-bottom:14px;">
+          Provide any reachable agent endpoint (e.g. <code>http://192.168.0.17:7892</code>). Paperclip-Ollama will test
+          the connection, discover models and skills, and link it as an active agent.
+        </p>
+        <div style="display:grid; grid-template-columns:2fr 1fr auto; gap:12px; align-items:end;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Agent Endpoint URL</label>
+            <input type="text" id="customAgentEndpoint" class="input-box" placeholder="http://192.168.0.17:7892"
+              value="http://192.168.0.17:7892" />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Display Name (Optional)</label>
+            <input type="text" id="customAgentName" class="input-box" placeholder="e.g. Hermes-Host-17" />
+          </div>
+          <button class="btn btn-emerald" style="padding:10px 18px;" onclick="submitCustomAgentNode()">
+            ⚡ Test & Connect Node
+          </button>
+        </div>
+      </div>
+
       <div id="hermesNodesGrid" class="org-grid"></div>
 
       <div class="sec-hdr" style="margin-top:28px;">
@@ -872,6 +949,30 @@
       const modelNames = ol.models.length > 0
         ? ol.models.map(m => m.name)
         : ['qwen2.5-coder:7b', 'qwen3.5:latest', 'qwen3:4b-instruct', 'qwen2.5-coder:1.5b'];
+
+      // Active Agent Node Information & Dropdown
+      const activeNodeId = st.active_hermes_node_id || (st.hermes_nodes?.[0]?.node_id);
+      const activeNode = (st.hermes_nodes || []).find(n => n.node_id === activeNodeId) || st.hermes_nodes?.[0];
+
+      const nodeDropdown = document.getElementById('agentNodeDropdown');
+      if (nodeDropdown) {
+        let opts = (st.hermes_nodes || []).map(n => {
+          const isAct = n.node_id === activeNodeId;
+          const hostPart = n.endpoint ? n.endpoint.replace(/^https?:\/\//, '') : '';
+          return `<option value="${n.node_id}" ${isAct ? 'selected' : ''}>${isAct ? '🟢 ' : '⚪ '}${escapeHtml(n.name)} (${escapeHtml(hostPart)})</option>`;
+        }).join('');
+        opts += `<option value="__NEW__">➕ Connect Custom Agent Node...</option>`;
+        nodeDropdown.innerHTML = opts;
+      }
+
+      if (activeNode) {
+        const epClean = activeNode.endpoint.replace(/^https?:\/\//, '');
+        document.getElementById('agentStatusText').textContent = `Agent: ${activeNode.name} (${epClean})`;
+        const activeLinkBtn = document.getElementById('activeAgentConsoleBtn');
+        if (activeLinkBtn) activeLinkBtn.href = activeNode.endpoint;
+        const statusBadge = document.getElementById('activeAgentNodeBadge');
+        if (statusBadge) statusBadge.textContent = `${activeNode.status} (${activeNode.model})`;
+      }
 
       // Populate New Agent Studio dropdowns
       const newModelSel = document.getElementById('newAgentModel');
@@ -946,7 +1047,7 @@
         const approveBtn = (t.status === 'AWAITING_APPROVAL' || !t.approved)
           ? `<button class="btn btn-emerald" onclick="approveTicket('${t.id}')">✅ Approve & Merge</button>`
           : `<span class="badge" style="color:#34d399; border-color:#10b981;">✓ Governance Approved</span>`;
-        
+
         let hermesLogBlock = '';
         if (t.hermes_log || (ag.adapter === 'hermes_bridge' && t.output)) {
           const hl = t.hermes_log || {};
@@ -1024,29 +1125,48 @@
       `).join('');
 
       // Render Hermes Nodes
-      document.getElementById('hermesNodesGrid').innerHTML = (st.hermes_nodes || []).map(n => `
-        <div class="agent-card">
-          <div class="agent-top">
-            <div class="agent-identity">
-              <div class="avatar">🪽</div>
-              <div>
-                <div class="agent-name">${n.name}</div>
-                <div class="agent-role">Node ID: ${n.node_id}</div>
+      document.getElementById('hermesNodesGrid').innerHTML = (st.hermes_nodes || []).map(n => {
+        const isActive = n.node_id === activeNodeId;
+        const cardStyle = isActive ? 'border-color:rgba(168,85,247,0.7); box-shadow:0 0 20px rgba(168,85,247,0.25);' : '';
+        const activeBadge = isActive
+          ? `<span class="badge" style="color:#a7f3d0; border-color:#059669; background:rgba(16,185,129,0.15);">🟢 ACTIVE</span>`
+          : `<span class="status-tag">${n.status}</span>`;
+        const actionBtn = isActive
+          ? `<span class="badge" style="justify-content:center; padding:7px 12px; color:#c084fc; border-color:rgba(168,85,247,0.4);">✓ Active Connection</span>`
+          : `<button class="btn btn-primary" style="padding:7px 12px; font-size:12px;" onclick="selectHermesNode('${n.node_id}')">⚡ Connect as Active</button>`;
+        const delBtn = (st.hermes_nodes || []).length > 1
+          ? `<button class="btn" style="padding:7px 10px; font-size:12px; color:#f87171;" title="Disconnect Node" onclick="disconnectHermesNode('${n.node_id}', '${escapeHtml(n.name)}')">🗑️</button>`
+          : '';
+
+        return `
+          <div class="agent-card" style="${cardStyle}">
+            <div class="agent-top">
+              <div class="agent-identity">
+                <div class="avatar">🪽</div>
+                <div>
+                  <div class="agent-name">${escapeHtml(n.name)}</div>
+                  <div class="agent-role">Node ID: <code>${escapeHtml(n.node_id)}</code></div>
+                </div>
               </div>
+              ${activeBadge}
             </div>
-            <span class="status-tag">${n.status}</span>
+            <div class="agent-meta">
+              <div>Agent Endpoint: <a href="${n.endpoint}" target="_blank" style="color:var(--cyan); font-family:monospace; font-size:11.5px;">${escapeHtml(n.endpoint)} ↗</a></div>
+              <div>Ollama Link: <code>${escapeHtml(n.ollama_url)}</code></div>
+              <div>Active Model: <code>${escapeHtml(n.model)}</code></div>
+              <div>Learned Skills: <strong>${n.skills_count}</strong> • Episodic Memories: <strong>${n.memories_count}</strong></div>
+              <div>Last Heartbeat: ${escapeHtml(n.last_heartbeat)}</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+              ${actionBtn}
+              <a class="btn btn-emerald" href="${n.endpoint}" target="_blank" style="flex:1; justify-content:center; padding:7px 10px; font-size:12px;">
+                🪽 Console ↗
+              </a>
+              ${delBtn}
+            </div>
           </div>
-          <div class="agent-meta">
-            <div>Ollama Link: <code>${n.ollama_url}</code></div>
-            <div>Active Model: <code>${n.model}</code></div>
-            <div>Learned Skills: <strong>${n.skills_count}</strong> • Episodic Memories: <strong>${n.memories_count}</strong></div>
-            <div>Last Heartbeat: ${n.last_heartbeat}</div>
-          </div>
-          <a class="btn btn-emerald" href="${hermesUrl}" target="_blank" style="width:100%; justify-content:center;">
-            🪽 Open Hermes Self-Improving Console
-          </a>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       // Render Hermes Ticket Completion Logs & Telemetry
       const hLogs = st.hermes_ticket_logs || [];
@@ -1113,6 +1233,93 @@
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // --- HERMES / AGENT NODE CONNECTION LOGIC ---
+    function onSelectHermesNode(val) {
+      if (val === '__NEW__') {
+        openConnectAgentModal();
+        return;
+      }
+      selectHermesNode(val);
+    }
+
+    async function selectHermesNode(nodeId) {
+      try {
+        const res = await fetch('/api/hermes/nodes/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: nodeId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          await loadState();
+        } else {
+          alert(data.detail || 'Failed to switch active agent connection');
+        }
+      } catch (e) {
+        alert('Error selecting agent node: ' + e);
+      }
+    }
+
+    function openConnectAgentModal() {
+      switchTab('hermes', document.querySelectorAll('.tab-btn')[3]);
+      const panel = document.getElementById('connectCustomAgentPanel');
+      if (panel) {
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('customAgentEndpoint')?.focus();
+      }
+    }
+
+    function closeConnectAgentModal() {
+      const panel = document.getElementById('connectCustomAgentPanel');
+      if (panel) panel.style.display = 'none';
+    }
+
+    async function submitCustomAgentNode() {
+      const endpoint = document.getElementById('customAgentEndpoint').value.trim();
+      const name = document.getElementById('customAgentName').value.trim();
+      if (!endpoint) {
+        alert('Please enter an agent endpoint URL (e.g. http://192.168.0.17:7892)');
+        return;
+      }
+      try {
+        const btn = event?.target;
+        const prevText = btn ? btn.textContent : '';
+        if (btn) btn.textContent = '⏳ Testing & Probing Endpoint...';
+        const res = await fetch('/api/hermes/nodes/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint, name })
+        });
+        const data = await res.json();
+        if (btn) btn.textContent = prevText;
+        if (data.ok) {
+          alert(`Successfully connected agent '${data.node.name}' (${data.node.endpoint})!\nDiscovered model: ${data.node.model}, skills: ${data.node.skills_count}`);
+          closeConnectAgentModal();
+          await loadState();
+        } else {
+          alert(data.detail || 'Failed to connect agent endpoint');
+        }
+      } catch (e) {
+        alert('Error connecting agent endpoint: ' + e);
+      }
+    }
+
+    async function disconnectHermesNode(nodeId, name) {
+      if (!confirm(`Disconnect agent node '${name}' (${nodeId})?`)) return;
+      try {
+        const res = await fetch(`/api/hermes/nodes/${nodeId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          await loadState();
+        } else {
+          alert(data.detail || 'Failed to disconnect agent node');
+        }
+      } catch (e) {
+        alert('Error disconnecting agent node: ' + e);
+      }
     }
 
     async function connectOllama() {
