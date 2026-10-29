@@ -5,6 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Paperclip-Ollama — Zero-Human AI Company Control Plane & Product Portal</title>
+  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/8915366?v=4" />
+  <link rel="apple-touch-icon" href="https://avatars.githubusercontent.com/u/8915366?v=4" />
   <style>
     :root {
       --bg-base: #060913;
@@ -464,8 +466,8 @@
       <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
       <button class="tab-btn" id="telegramTabBtn" onclick="switchTab('telegram', this)">📱 Telegram
         (908-845-3667)</button>
-      <button class="tab-btn" id="n8nTabBtn" onclick="switchTab('n8n', this)">⚡ n8n Automations</button>
-      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')" style="opacity:0.75; font-size:11.5px;">n8n UI ↗</button>
+      <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678)
+        ↗</button>
       <button class="tab-btn" onclick="switchTab('audit', this)">📜 Governance & Audit</button>
     </nav>
 
@@ -1037,70 +1039,6 @@
       </div>
     </section>
 
-    <!-- N8N AUTOMATION VIEW -->
-    <section class="view-section" id="view-n8n">
-      <div class="sec-hdr">
-        <div>
-          <h2>⚡ n8n Enterprise Workflow Automation Hub</h2>
-          <div style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">
-            Orchestrates autonomous tickets, GPU benchmark loops, K3s storage policies, and Telegram routing via n8n on <strong>NodePort 30678</strong>.
-          </div>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <a class="btn btn-emerald" href="http://192.168.0.81:30678" target="_blank">🌐 Open n8n Canvas UI (30678) ↗</a>
-          <button class="btn" onclick="loadN8nWorkflows()">🔄 Refresh Workflows</button>
-        </div>
-      </div>
-
-      <!-- N8N CLUSTER STATUS CARDS -->
-      <div class="org-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom:20px;">
-        <div class="panel" style="border-color:rgba(245,158,11,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">n8n Engine URL</div>
-          <div style="font-size:20px; font-weight:800; color:#fbbf24; margin:6px 0; font-family:monospace;">192.168.0.81:30678</div>
-          <div style="font-size:12px; color:#34d399;">✓ K3s Namespace: <code>ai</code></div>
-        </div>
-
-        <div class="panel" style="border-color:rgba(16,185,129,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Active Production Workflows</div>
-          <div style="font-size:24px; font-weight:800; color:#34d399; margin:6px 0;" id="n8nWfCount">4 Active</div>
-          <div style="font-size:12px; color:var(--text-sub);">All Published &amp; Executing</div>
-        </div>
-
-        <div class="panel" style="border-color:rgba(14,165,233,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Ticket Auto-Ingestion</div>
-          <div style="font-size:20px; font-weight:800; color:#38bdf8; margin:6px 0;">ENABLED</div>
-          <div style="font-size:12px; color:var(--text-sub);">Webhook: <code>/paperclip-ticket-created</code></div>
-        </div>
-
-        <div class="panel" style="border-color:rgba(168,85,247,0.4);">
-          <div style="font-size:12px; color:var(--text-sub); text-transform:uppercase; font-weight:700;">Ticket Workflow Generator</div>
-          <div style="font-size:20px; font-weight:800; color:#c084fc; margin:6px 0;">AUTONOMOUS</div>
-          <div style="font-size:12px; color:var(--text-sub);">Synthesizes n8n blueprints</div>
-        </div>
-      </div>
-
-      <!-- WORKFLOWS GRID -->
-      <h3 style="margin-bottom:12px; font-size:16px;">Active n8n Workflows Created From Tickets</h3>
-      <div id="n8nWorkflowsGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap:16px; margin-bottom:24px;">
-        <!-- Populated via JS -->
-      </div>
-
-      <!-- SYNTHESIZE WORKFLOW FROM TICKET PANEL -->
-      <div class="panel" style="background:#090d16; border:1px solid rgba(255,255,255,0.08); padding:20px; border-radius:12px;">
-        <h3 style="margin-top:0; margin-bottom:8px; font-size:16px;">⚡ Create New n8n Workflow from Paperclip Ticket</h3>
-        <p style="font-size:12.5px; color:var(--text-sub); margin-bottom:16px;">
-          Select any existing ticket in Sovereign AI Corp. The n8n Synthesizer will automatically convert the ticket objective into an active production automation pipeline.
-        </p>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-          <select id="n8nTicketSelect" style="flex:1; min-width:240px; background:#050811; color:#fff; border:1px solid var(--border); border-radius:6px; padding:10px 14px; font-size:13px;">
-            <option value="">Loading tickets...</option>
-          </select>
-          <button class="btn btn-emerald" onclick="createWorkflowFromSelectedTicket()">✨ Synthesize &amp; Deploy Workflow</button>
-        </div>
-        <div id="n8nSynthResult" style="margin-top:12px; font-size:12px; font-family:monospace; display:none;"></div>
-      </div>
-    </section>
-
   </main>
 
   <script>
@@ -1126,7 +1064,6 @@
       appData = await res.json();
       renderAll();
       loadTelegramStatus();
-      loadN8nWorkflows();
     }
 
     function renderAll() {
@@ -1285,7 +1222,6 @@
                 <strong style="font-size:14.5px; margin-left:6px;">${escapeHtml(t.title)}</strong>
               </div>
               <div style="display:flex; gap:8px; align-items:center;">
-                <button class="btn" style="font-size:11px; padding:4px 8px; border-color:rgba(245,158,11,0.5); color:#fbbf24;" onclick="triggerN8nFromTicket('${t.id}')">⚡ n8n Workflow</button>
                 <span class="badge">${t.status}</span>
                 ${approveBtn}
               </div>
@@ -2039,121 +1975,6 @@
       });
       await loadState();
       await loadOllamaLibrary();
-    }
-
-    // --- N8N WORKFLOW AUTOMATION ENGINE ---
-    let n8nWorkflowsList = [];
-
-    async function loadN8nWorkflows() {
-      try {
-        const res = await fetch('/api/n8n/workflows');
-        const data = await res.json();
-        if (data.ok && data.workflows) {
-          n8nWorkflowsList = data.workflows;
-          renderN8nWorkflows();
-        }
-      } catch (err) {
-        console.error('Failed to load n8n workflows:', err);
-      }
-    }
-
-    function renderN8nWorkflows() {
-      const container = document.getElementById('n8nWorkflowsGrid');
-      const countEl = document.getElementById('n8nWfCount');
-      if (countEl) countEl.textContent = `${n8nWorkflowsList.length} Active`;
-
-      if (container) {
-        container.innerHTML = n8nWorkflowsList.map(wf => `
-          <div class="panel" style="background:#090d16; border:1px solid rgba(255,255,255,0.08); padding:16px; border-radius:10px; display:flex; flex-direction:column; justify-content:space-between;">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span class="badge" style="color:#fbbf24; border-color:#d97706;">${escapeHtml(wf.source)}</span>
-                <span class="badge" style="color:#34d399; border-color:#059669;">● ${escapeHtml(wf.status)}</span>
-              </div>
-              <strong style="font-size:14px; color:#f8fafc; display:block; margin-bottom:6px;">${escapeHtml(wf.name)}</strong>
-              <div style="font-size:12px; color:var(--text-sub); line-height:1.5; margin-bottom:12px;">
-                ${escapeHtml(wf.description)}
-              </div>
-              <div style="font-size:11px; font-family:monospace; background:rgba(0,0,0,0.4); padding:6px 10px; border-radius:6px; margin-bottom:12px; color:#94a3b8; word-break:break-all;">
-                ⚡ <strong>Trigger:</strong> ${escapeHtml(wf.trigger_type)}<br>
-                🔗 <code>${escapeHtml(wf.url)}</code>
-              </div>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-              <button class="btn btn-emerald" style="flex:1; font-size:12px; padding:6px 10px;" onclick="triggerN8nWorkflow('${wf.slug}')">⚡ Trigger Live in n8n</button>
-              <a class="btn" style="font-size:12px; padding:6px 10px;" href="http://192.168.0.81:30678" target="_blank">View ↗</a>
-            </div>
-          </div>
-        `).join('');
-      }
-
-      // Populate Ticket Select Dropdown
-      const sel = document.getElementById('n8nTicketSelect');
-      if (sel && appData?.state?.tickets) {
-        sel.innerHTML = '<option value="">-- Choose a Ticket to Synthesize --</option>' + 
-          appData.state.tickets.map(t => `<option value="${t.id}">${t.id}: ${escapeHtml(t.title)} (${t.assigned_to})</option>`).join('');
-      }
-    }
-
-    async function triggerN8nWorkflow(slug) {
-      try {
-        const res = await fetch('/api/n8n/trigger', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({slug: slug, data: {trigger_source: 'paperclip_ui', timestamp: new Date().toISOString()}})
-        });
-        const d = await res.json();
-        alert(`[n8n Workflow Dispatched] Successfully triggered '${slug}'!\nResponse: ${JSON.stringify(d.result)}`);
-        loadState();
-      } catch (e) {
-        alert('Error triggering n8n workflow: ' + e);
-      }
-    }
-
-    async function triggerN8nFromTicket(ticketId) {
-      const t = (appData?.state?.tickets || []).find(x => x.id === ticketId);
-      if (!t) return;
-      let slug = 'paperclip-ticket-created';
-      if (ticketId === 'TCK-101') slug = 'tck-101-k3s-autoscaling';
-      else if (ticketId === 'TCK-102') slug = 'tck-102-rtx3060-benchmark';
-
-      try {
-        const res = await fetch('/api/n8n/trigger', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({slug: slug, data: {ticket: t, triggered_from: 'ticket_card'}})
-        });
-        const d = await res.json();
-        alert(`⚡ Ticket #${ticketId} dispatched to n8n workflow [${slug}]!\nResult: ${JSON.stringify(d.result)}`);
-        loadState();
-      } catch (e) {
-        alert('Error triggering n8n workflow: ' + e);
-      }
-    }
-
-    async function createWorkflowFromSelectedTicket() {
-      const sel = document.getElementById('n8nTicketSelect');
-      const ticketId = sel.value;
-      if (!ticketId) {
-        alert('Please select a ticket first');
-        return;
-      }
-      const resDiv = document.getElementById('n8nSynthResult');
-      resDiv.style.display = 'block';
-      resDiv.textContent = `[*] Synthesizing n8n workflow from ${ticketId}...`;
-      try {
-        const res = await fetch('/api/n8n/create_workflow_from_ticket', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ticket_id: ticketId})
-        });
-        const d = await res.json();
-        resDiv.innerHTML = `<span style="color:#34d399;">✓ Workflow synthesized for ${ticketId}! Active on n8n (NodePort 30678).</span>`;
-        loadN8nWorkflows();
-        loadState();
-      } catch (e) {
-        resDiv.innerHTML = `<span style="color:#f87171;">Error synthesizing workflow: ${e}</span>`;
-      }
     }
 
     loadState();
