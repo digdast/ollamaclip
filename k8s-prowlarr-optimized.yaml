@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowlarr
+  namespace: media
+  labels:
+    app: prowlarr
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: prowlarr
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: prowlarr
+    spec:
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "1"
+        - name: single-request-reopen
+        - name: timeout
+          value: "2"
+        - name: attempts
+          value: "2"
+      nodeSelector:
+        node-role.kubernetes.io/worker: worker
+      containers:
+      - name: prowlarr
+        image: lscr.io/linuxserver/prowlarr:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9696
+          name: http
+          protocol: TCP
+        env:
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        - name: TZ
+          value: "America/New_York"
+        - name: UMASK
+          value: "002"
+        # .NET Performance & Multi-threaded GC Tuning
+        - name: DOTNET_gcServer
+          value: "1"
+        - name: DOTNET_TieredPGO
+          value: "1"
+        - name: DOTNET_TC_QuickJitForLoops
+          value: "1"
+        - name: DOTNET_ReadyToRun
+          value: "1"
+        - name: DOTNET_ThreadPool_MinThreads
+          value: "16"
+        - name: DOTNET_GCHeapHardLimitPercent
+          value: "85"
+        - name: DOTNET_EnableWriteXorExecute
+          value: "0"
+        - name: DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2SUPPORT
+          value: "true"
+        # High Performance Resource Allocation
+        resources:
+          requests:
+            cpu: "2000m"
+            memory: "4Gi"
+          limits:
+            cpu: "8"
+            memory: "12Gi"
+        volumeMounts:
+        - mountPath: /config
+          name: config
+        - mountPath: /data
+          name: data
+        - mountPath: /tmp
+          name: tmpfs
+      restartPolicy: Always
+      volumes:
+      - name: config
+        hostPath:
+          path: /data/config/prowlarr
+          type: DirectoryOrCreate
+      - name: data
+        hostPath:
+          path: /data
+          type: Directory
+      # In-memory tmpfs increased to 2Gi to eliminate NFS write latency
+      - name: tmpfs
+        emptyDir:
+          medium: Memory
+          sizeLimit: "2Gi"
