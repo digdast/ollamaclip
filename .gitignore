@@ -8,6 +8,8 @@ env/
 venv/
 data/paperclip_state.json
 data/hermes_vault.json
+synapseflow/data/
+scratch/
 *.zip
 .DS_Store
 Thumbs.db

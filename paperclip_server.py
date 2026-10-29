@@ -569,47 +569,6 @@ async def update_agent_model(agent_id: str, payload: Dict[str, Any] = Body(...))
     raise HTTPException(status_code=404, detail="Agent not found")
 
 
-async def dispatch_ticket_to_n8n(ticket: Dict[str, Any]):
-    """Dispatches newly created tickets to n8n workflows in the cluster."""
-    endpoints = [
-        "http://n8n.ai.svc.cluster.local:5678/webhook/paperclip-ticket-created",
-        "http://192.168.0.81:30678/webhook/paperclip-ticket-created",
-    ]
-    payload = json.dumps({"ticket": ticket}).encode("utf-8")
-    for ep in endpoints:
-        try:
-            req = urllib.request.Request(
-                ep,
-                data=payload,
-                headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
-                method="POST",
-            )
-            await asyncio.to_thread(urllib.request.urlopen, req, timeout=3)
-            break
-        except Exception:
-            continue
-
-    # If ticket mentions automation or workflow, also trigger synthesizer webhook
-    full_text = (ticket.get("title", "") + " " + ticket.get("description", "")).lower()
-    if any(k in full_text for k in ["workflow", "automate", "automation", "pipeline", "n8n"]):
-        synth_endpoints = [
-            "http://n8n.ai.svc.cluster.local:5678/webhook/synthesize-workflow-from-ticket",
-            "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket",
-        ]
-        for ep in synth_endpoints:
-            try:
-                req = urllib.request.Request(
-                    ep,
-                    data=payload,
-                    headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
-                    method="POST",
-                )
-                await asyncio.to_thread(urllib.request.urlopen, req, timeout=3)
-                break
-            except Exception:
-                continue
-
-
 @app.post("/api/tickets")
 async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     state = load_state()
@@ -637,9 +596,6 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     state["tickets"].insert(0, ticket)
     add_audit(state, agent["name"], f"Created ticket {tck_id}: '{ticket['title']}' assigned to {agent['name']} ({agent['model']})", "INFO")
     save_state(state)
-
-    # Dispatches ticket creation event to n8n workflow cluster
-    asyncio.create_task(dispatch_ticket_to_n8n(ticket))
 
     if auto_execute:
         res = await execute_ticket_internal(tck_id)
@@ -947,8 +903,8 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
         add_audit(state, "Control Plane", f"Placed {ticket_id} into Desktop Hermes Work Queue (executing on local RTX 3060 GPU)", "INFO")
         save_state(state)
         
-        # Wait up to 240s for Desktop Hermes worker to process and submit via /api/hermes/complete_ticket
-        for _ in range(240):
+        # Wait up to 120s for Desktop Hermes worker to process and submit via /api/hermes/complete_ticket
+        for _ in range(120):
             await asyncio.sleep(1)
             st_cur = load_state()
             t_cur = next((t for t in st_cur["tickets"] if t["id"] == ticket_id), None)
@@ -2144,117 +2100,6 @@ async def delete_ollama_model(payload: Dict[str, Any] = Body(...)):
     save_state(state)
     ollama_info = await asyncio.to_thread(probe_ollama, state["ollama_url"])
     return {"ok": True, "ollama": ollama_info, "state": state}
-
-
-# --- N8N WORKFLOW AUTOMATION ENGINE ---
-@app.post("/api/audit")
-async def log_external_audit(payload: Dict[str, Any] = Body(...)):
-    state = load_state()
-    actor = payload.get("actor") or payload.get("agent") or "n8n Automation"
-    event = payload.get("event") or payload.get("message") or "External action completed"
-    level = payload.get("level") or "SUCCESS"
-    add_audit(state, actor, event, level)
-    save_state(state)
-    return {"ok": True}
-
-
-@app.get("/api/n8n/workflows")
-async def list_n8n_workflows():
-    state = load_state()
-    workflows = [
-        {
-            "id": "paperclip-ticket-created",
-            "name": "Paperclip Ticket Ingestion & Swarm Dispatcher",
-            "slug": "paperclip-ticket-created",
-            "trigger_type": "Webhook (Instant)",
-            "url": "http://192.168.0.81:30678/webhook/paperclip-ticket-created",
-            "status": "ACTIVE",
-            "source": "Core Orchestrator",
-            "description": "Auto-ingests all tickets created in Paperclip, routes to GPU nodes (Desktop RTX 3060, Host 17, K3s) and logs audit.",
-        },
-        {
-            "id": "tck-101-k3s-autoscaling",
-            "name": "TCK-101: K3s Autoscaling & NVMe Storage Automation",
-            "slug": "tck-101-k3s-autoscaling",
-            "trigger_type": "Schedule (Every 2h) & Webhook",
-            "url": "http://192.168.0.81:30678/webhook/tck-101-k3s-autoscaling",
-            "status": "ACTIVE",
-            "source": "Ticket TCK-101",
-            "description": "Monitors K3s cluster storage isolation, SQLite WAL NVMe pinning, and HorizontalPodAutoscaler QoS enforcement.",
-        },
-        {
-            "id": "tck-102-rtx3060-benchmark",
-            "name": "TCK-102: RTX 3060 CUDA Hardware Benchmark",
-            "slug": "tck-102-rtx3060-benchmark",
-            "trigger_type": "Schedule (Every 6h) & Webhook",
-            "url": "http://192.168.0.81:30678/webhook/tck-102-rtx3060-benchmark",
-            "status": "ACTIVE",
-            "source": "Ticket TCK-102",
-            "description": "Dispatches automated inference latency and tokens/sec telemetry benchmark to DESKTOP-EFRAIN RTX 3060 12GB GPU.",
-        },
-        {
-            "id": "synthesize-workflow-from-ticket",
-            "name": "Autonomous Ticket-to-Workflow Synthesizer",
-            "slug": "synthesize-workflow-from-ticket",
-            "trigger_type": "Webhook (Instant)",
-            "url": "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket",
-            "status": "ACTIVE",
-            "source": "Core Blueprint Synthesizer",
-            "description": "Autonomous blueprint synthesizer generating active production n8n workflows from user requests.",
-        },
-    ]
-    return {
-        "ok": True,
-        "n8n_base_url": "http://192.168.0.81:30678",
-        "workflows": workflows,
-    }
-
-
-@app.post("/api/n8n/trigger")
-async def trigger_n8n_workflow_endpoint(payload: Dict[str, Any] = Body(...)):
-    slug = payload.get("slug", "paperclip-ticket-created")
-    custom_data = payload.get("data", {})
-    url = f"http://192.168.0.81:30678/webhook/{slug}"
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(custom_data).encode("utf-8"),
-            headers={"Content-Type": "application/json", "User-Agent": "Paperclip-UI/2.0"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
-        res = {"message": f"Trigger submitted: {exc}"}
-    state = load_state()
-    add_audit(state, "n8n Webhook", f"Manually triggered workflow '{slug}' via Control Plane", "SUCCESS")
-    save_state(state)
-    return {"ok": True, "result": res}
-
-
-@app.post("/api/n8n/create_workflow_from_ticket")
-async def create_workflow_from_ticket_endpoint(payload: Dict[str, Any] = Body(...)):
-    ticket_id = payload.get("ticket_id")
-    state = load_state()
-    target_ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), None)
-    if not target_ticket:
-        raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found")
-
-    # Dispatch to n8n synthesizer webhook
-    synth_url = "http://192.168.0.81:30678/webhook/synthesize-workflow-from-ticket"
-    req_body = json.dumps({"ticket": target_ticket}).encode("utf-8")
-    req = urllib.request.Request(
-        synth_url,
-        data=req_body,
-        headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Core/2.0"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        res = json.loads(resp.read().decode("utf-8"))
-
-    add_audit(state, "Paperclip Engine", f"Created n8n automation workflow for {ticket_id} ('{target_ticket['title']}')", "SUCCESS")
-    save_state(state)
-    return {"ok": True, "ticket": target_ticket, "result": res}
 
 
 @app.get("/download/paperclip-hermes-suite.zip")
