@@ -117,15 +117,6 @@ flowchart TD
 - **Inbound Task Dispatch**: Send any task or message to your Telegram bot; Paperclip ingests it, delegates it to the appropriate specialist agent (or CTO), executes it via local Ollama / Hermes GPU swarm, and returns the finished deliverable directly to your chat.
 - **Bot Commands**: `/status`, `/agents`, `/nodes`, `/hire <role>`.
 
-### 6. ⚡ n8n Enterprise Workflow Automation Hub (NodePort 30678)
-- **Direct Ticket-to-Workflow Engine**: Every ticket created in Paperclip triggers automated n8n workflows in the K3s cluster.
-- **Active Production Workflows Created**:
-  1. **Paperclip Ticket Ingestion & Swarm Dispatcher** (`/webhook/paperclip-ticket-created`): Ingests newly created tickets in real time, routes tasks to appropriate GPU compute tiers (Desktop RTX 3060, Host 17, K3s), and records audit trails.
-  2. **TCK-101: K3s Autoscaling & NVMe Storage Automation** (`/webhook/tck-101-k3s-autoscaling`): Scheduled every 2 hours and on-demand to enforce SQLite NVMe storage isolation and HorizontalPodAutoscaler QoS policies designed in Ticket TCK-101.
-  3. **TCK-102: RTX 3060 CUDA Hardware Benchmark** (`/webhook/tck-102-rtx3060-benchmark`): Scheduled every 6 hours and on-demand to dispatch automated CUDA benchmark telemetry jobs to `DESKTOP-EFRAIN` (RTX 3060 12GB) designed in Ticket TCK-102.
-  4. **Autonomous Ticket-to-Workflow Synthesizer** (`/webhook/synthesize-workflow-from-ticket`): Automatically parses ticket requests and synthesizes active n8n automation pipelines on the fly.
-- **Paperclip UI Automation Hub**: Full interactive dashboard in Paperclip (`view-n8n`) with 1-click live workflow triggering and canvas link to `http://192.168.0.81:30678`.
-
 ---
 
 ## 🗺️ Network & Service Endpoints
@@ -133,7 +124,6 @@ flowchart TD
 | Service / Node | IP & Port | Cluster Address | Role |
 | :--- | :--- | :--- | :--- |
 | **Paperclip Control Plane** | `http://192.168.0.81:30791` | `http://paperclip.ai.svc.cluster.local:7891` | Web UI, Org Chart, Ticket Router |
-| **Hermes Agent (Desktop RTX 3060)** | `http://192.168.0.25:7892` | N/A (Outbound Work Queue) | DESKTOP-EFRAIN 12GB CUDA Worker |
 | **Hermes Agent (Host 17)** | `http://192.168.0.17:7892` | N/A (Direct Host LAN) | Bare-Metal GPU Autonomous Worker |
 | **Hermes Agent (K3s)** | `http://192.168.0.81:30792` | `http://hermes.ai.svc.cluster.local:7892` | Kubernetes Cluster Local Worker |
 | **Ollama Backend Engine** | `http://192.168.0.17:11434` | N/A (Direct Host LAN) | 15+ GGUF LLMs (Qwen, DeepSeek, Llama) |
