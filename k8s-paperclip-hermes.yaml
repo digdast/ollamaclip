@@ -21,7 +21,7 @@ spec:
         app: paperclip
     spec:
       nodeSelector:
-        kubernetes.io/hostname: k8s-cp-01
+        kubernetes.io/hostname: k3s-cp-01
       containers:
       - name: paperclip
         image: python:3.11-slim
@@ -34,7 +34,7 @@ spec:
         - name: OLLAMA_URL
           value: "http://192.168.0.17:11434"
         - name: HERMES_URL
-          value: "http://hermes.ai.svc.cluster.local:7892"
+          value: "http://192.168.0.17:7892"
         - name: PAPERCLIP_PORT
           value: "7891"
         - name: DATA_DIR
@@ -55,7 +55,7 @@ spec:
       volumes:
       - name: app-volume
         hostPath:
-          path: /data/appdata/ollamaclip
+          path: /var/lib/appdata/ollamaclip
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -91,7 +91,7 @@ spec:
         app: hermes
     spec:
       nodeSelector:
-        kubernetes.io/hostname: k8s-cp-01
+        kubernetes.io/hostname: k3s-cp-01
       containers:
       - name: hermes
         image: python:3.11-slim
@@ -127,7 +127,7 @@ spec:
       volumes:
       - name: app-volume
         hostPath:
-          path: /data/appdata/ollamaclip
+          path: /var/lib/appdata/ollamaclip
           type: DirectoryOrCreate
 ---
 apiVersion: v1
