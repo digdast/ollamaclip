@@ -455,6 +455,76 @@ async def get_state():
     }
 
 
+@app.get("/api/telemetry")
+async def get_telemetry():
+    state = load_state()
+    ollama_info = await asyncio.to_thread(probe_ollama, state["ollama_url"])
+    agents = state.get("agents", [])
+    tickets = state.get("tickets", [])
+    hermes_nodes = state.get("hermes_nodes", [])
+
+    total_tokens_used = sum(int(a.get("tokens_used", 0)) for a in agents)
+    total_budget_tokens = sum(int(a.get("budget_tokens", 1000000)) for a in agents)
+    active_agents = sum(1 for a in agents if a.get("status") in ["BUSY", "EXECUTING", "ONLINE", "ACTIVE"])
+    idle_agents = sum(1 for a in agents if a.get("status") == "IDLE")
+
+    completed_tickets = sum(1 for t in tickets if t.get("status") == "COMPLETED")
+    pending_tickets = sum(1 for t in tickets if t.get("status") in ["OPEN", "PENDING", "IN_PROGRESS", "ASSIGNED"])
+    auto_executed_tickets = sum(1 for t in tickets if t.get("auto_execute"))
+
+    running_models = ollama_info.get("running_models", [])
+
+    return {
+        "status": "online",
+        "system": {
+            "service": "Paperclip-Ollama (ClipOS)",
+            "version": "1.0.0",
+            "active_node_id": state.get("active_hermes_node_id", "hermes-host-17"),
+            "timestamp": time.time(),
+            "uptime_status": "ACTIVE"
+        },
+        "swarm": {
+            "agents_count": len(agents),
+            "active_agents": active_agents,
+            "idle_agents": idle_agents,
+            "hermes_nodes_count": len(hermes_nodes),
+            "hermes_nodes": hermes_nodes,
+            "total_tokens_used": total_tokens_used,
+            "total_budget_tokens": total_budget_tokens,
+            "budget_utilization_pct": round((total_tokens_used / max(total_budget_tokens, 1)) * 100, 2),
+            "agents": [
+                {
+                    "id": a.get("id"),
+                    "name": a.get("name"),
+                    "avatar": a.get("avatar", "🤖"),
+                    "role": a.get("role"),
+                    "model": a.get("model"),
+                    "status": a.get("status", "IDLE"),
+                    "tokens_used": a.get("tokens_used", 0),
+                    "budget_tokens": a.get("budget_tokens", 1000000)
+                }
+                for a in agents
+            ]
+        },
+        "inference": {
+            "connected": bool(ollama_info.get("connected")),
+            "url": state.get("ollama_url", DEFAULT_OLLAMA_URL),
+            "version": ollama_info.get("version"),
+            "latency_ms": ollama_info.get("latency_ms"),
+            "models_count": ollama_info.get("models_count", 0),
+            "running_models": running_models,
+            "running_models_count": len(running_models)
+        },
+        "pipeline": {
+            "tickets_total": len(tickets),
+            "completed": completed_tickets,
+            "pending": pending_tickets,
+            "auto_executed": auto_executed_tickets,
+            "auto_execute_rate_pct": round((auto_executed_tickets / max(len(tickets), 1)) * 100, 1)
+        }
+    }
+
+
 @app.post("/api/ollama/connect")
 async def connect_ollama(payload: Dict[str, Any] = Body(...)):
     state = load_state()
