@@ -666,6 +666,7 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     state["tickets"].insert(0, ticket)
     add_audit(state, agent["name"], f"Created ticket {tck_id}: '{ticket['title']}' assigned to {agent['name']} ({agent['model']})", "INFO")
     save_state(state)
+    asyncio.create_task(dispatch_to_n8n_async("ticket_created", ticket, agent))
 
     if auto_execute:
         res = await execute_ticket_internal(tck_id)
@@ -838,6 +839,66 @@ def telegram_notify_sync(text: str) -> bool:
 
 async def telegram_notify_async(text: str):
     await asyncio.to_thread(telegram_notify_sync, text)
+
+
+# --- N8N WORKFLOW PIPELINE DISPATCH CORE ---
+N8N_BASE_URLS = [
+    os.environ.get("N8N_URL", "http://n8n.ai.svc.cluster.local:5678"),
+    "http://n8n.ai.svc.cluster.local:5678",
+    "http://192.168.0.81:30678",
+]
+
+
+def dispatch_to_n8n_sync(event: str, ticket: Dict[str, Any], agent: Dict[str, Any]) -> bool:
+    """Passes agent workflow events and deliverables directly to n8n webhook pipelines."""
+    payload = {
+        "event": event,
+        "source": "paperclip-control-plane",
+        "ticket_id": ticket.get("id"),
+        "title": ticket.get("title"),
+        "description": ticket.get("description"),
+        "assigned_to": agent.get("id"),
+        "agent_name": agent.get("name"),
+        "agent_role": agent.get("role"),
+        "avatar": agent.get("avatar", "🤖"),
+        "model": ticket.get("model_used") or agent.get("model"),
+        "tokens": ticket.get("tokens", 0),
+        "duration_ms": ticket.get("duration_ms", 0),
+        "deliverable": ticket.get("output", ""),
+        "status": ticket.get("status"),
+        "timestamp": ticket.get("updated_at") or time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    encoded = json.dumps(payload).encode("utf-8")
+
+    agent_slug = (agent.get("id") or "").replace("agent-", "")
+    target_paths = ["paperclip-ticket"]
+    if agent_slug:
+        target_paths.append(f"agent-{agent_slug}")
+    target_paths.append("agent-swarm-gateway")
+
+    delivered = False
+    for base_url in N8N_BASE_URLS:
+        for path in target_paths:
+            url = f"{base_url.rstrip('/')}/webhook/{path}"
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=encoded,
+                    headers={"Content-Type": "application/json", "User-Agent": "Paperclip-Swarm/1.0"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    if resp.status in (200, 201):
+                        delivered = True
+            except Exception:
+                continue
+        if delivered:
+            break
+    return delivered
+
+
+async def dispatch_to_n8n_async(event: str, ticket: Dict[str, Any], agent: Dict[str, Any]):
+    await asyncio.to_thread(dispatch_to_n8n_sync, event, ticket, agent)
 
 
 def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) -> Optional[str]:
@@ -1114,6 +1175,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         )
                 except Exception:
                     pass
+                asyncio.create_task(dispatch_to_n8n_async("ticket_completed", ticket, agent))
                 return {"ticket": ticket, "state": state}
             except Exception:
                 continue
@@ -1194,6 +1256,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                 )
         except Exception:
             pass
+        asyncio.create_task(dispatch_to_n8n_async("ticket_completed", ticket, agent))
     except Exception as exc:
         state = load_state()
         ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
@@ -1222,8 +1285,21 @@ async def approve_ticket(ticket_id: str):
             t["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
             add_audit(state, "Governance Gate", f"Approved & merged deliverable for ticket {ticket_id} ('{t['title']}')", "SUCCESS")
             save_state(state)
+            agent = next((a for a in state["agents"] if a["id"] == t.get("assigned_to")), state["agents"][0])
+            asyncio.create_task(dispatch_to_n8n_async("ticket_approved", t, agent))
             return {"ok": True, "ticket": t, "state": state}
     raise HTTPException(status_code=404, detail="Ticket not found")
+
+
+@app.post("/api/audit")
+async def post_audit_log(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    actor = payload.get("actor") or "n8n Workflow"
+    event = payload.get("event") or payload.get("action") or "Workflow executed in n8n"
+    level = payload.get("level") or payload.get("status") or "SUCCESS"
+    add_audit(state, actor, event, level)
+    save_state(state)
+    return {"ok": True, "actor": actor, "event": event, "level": level}
 
 
 # --- HERMES ADAPTER BRIDGE ENDPOINTS ---
@@ -1338,6 +1414,7 @@ async def complete_hermes_ticket_callback(payload: Dict[str, Any] = Body(...)):
 
     add_audit(state, agent["name"], f"Hermes completed {ticket_id} via autonomous worker loop ({ticket['tokens']} tokens in {ticket['duration_ms']} ms)", "SUCCESS")
     save_state(state)
+    asyncio.create_task(dispatch_to_n8n_async("ticket_completed", ticket, agent))
 
     # Deliver to Telegram with zero truncation
     try:
