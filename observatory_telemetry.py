@@ -394,6 +394,9 @@ def build_observatory_payload(data_dir: str) -> Dict[str, Any]:
             "projects_count": len(my_projects),
             "skills_count": sk_cnt,
             "endpoint": endpoint,
+            "partner_id": a.get("partner_id", ""),
+            "partner_name": a.get("partner_name", ""),
+            "coop_specialty": a.get("coop_specialty", ""),
             "recent_projects": my_projects[:4],
         })
 

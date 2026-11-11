@@ -489,12 +489,131 @@ def load_state() -> Dict[str, Any]:
                     if not ag.get("avatar") or ag.get("avatar") == "🤖":
                         ag["avatar"] = "🪽"
 
+            if ensure_every_hermes_has_claude_partner(st):
+                save_state(st)
+
             return st
         except Exception:
             pass
     st = default_state()
+    ensure_every_hermes_has_claude_partner(st)
     save_state(st)
     return st
+
+
+PROFITABLE_DYAD_SPECIALTIES: List[Dict[str, str]] = [
+    {
+        "vertical": "FinTech, Mortgage & Compound Wealth Calculators ($45+ AdSense RPM)",
+        "focus": "High-CPM interactive financial calculators, mortgage amortization, tax optimization, and retirement wealth simulators.",
+    },
+    {
+        "vertical": "AI Micro-SaaS, Prompt Studios & Developer Productivity Web Apps",
+        "focus": "Viral developer utilities, AI prompt engineering workbenches, JSON/Regex/YAML studios, and API cost calculators.",
+    },
+    {
+        "vertical": "Real Estate ROI, Cap Rate & Solar Energy Payback Estimators",
+        "focus": "High-intent real estate investment cashflow analyzers, rental cap rate calculators, and solar battery ROI estimators.",
+    },
+    {
+        "vertical": "E-Commerce Profit Margin, ROAS & SEO Keyword Revenue Tools",
+        "focus": "B2B e-commerce FBA/Shopify profit margin calculators, ad ROAS forecasters, and website AdSense RPM estimators.",
+    },
+    {
+        "vertical": "Quant Crypto Arbitrage, Options Greeks & Cloud FinOps Simulators",
+        "focus": "Interactive options pricing calculators, DeFi/crypto yield comparators, and Cloud vs Bare-Metal GPU TCO tools.",
+    },
+]
+
+
+def ensure_every_hermes_has_claude_partner(st: Dict[str, Any]) -> bool:
+    """
+    Guarantees that EVERY Hermes agent in st['agents'] has its own dedicated 1-to-1 Claude agent partner
+    (and vice versa) to collaborate on creating unique, profitable, AdSense-monetized websites in K3s dev.
+    """
+    changed = False
+    agents = st.setdefault("agents", [])
+    agent_by_id = {a.get("id"): a for a in agents if a.get("id")}
+
+    hermes_agents = [
+        a for a in agents
+        if a.get("adapter") == "hermes_bridge" or "hermes" in a.get("id", "").lower() or "hermes" in a.get("name", "").lower()
+    ]
+
+    for idx, h_ag in enumerate(hermes_agents):
+        h_id = h_ag.get("id", f"agent-hermes-{idx + 1}")
+        h_name = h_ag.get("name", f"Hermes-{idx + 1:02d}")
+        spec = PROFITABLE_DYAD_SPECIALTIES[idx % len(PROFITABLE_DYAD_SPECIALTIES)]
+
+        # Determine dedicated 1-to-1 Claude partner ID
+        if h_id == "agent-hermes":
+            c_id = "agent-claude"
+            c_default_name = "Claude-01"
+        elif "hermes" in h_id.lower():
+            c_id = re.sub(r"(?i)hermes", "claude", h_id)
+            c_default_name = re.sub(r"(?i)hermes", "Claude", h_name)
+            if c_default_name == h_name:
+                c_default_name = f"Claude-{h_name}"
+        else:
+            c_id = f"{h_id}-claude"
+            c_default_name = f"Claude ({h_name} Partner)"
+
+        # Distinguish duplicate display names if needed
+        if c_id == "agent-claude-k3s-primary" and c_default_name == "Claude-01":
+            c_default_name = "Claude-K3s-Primary"
+        if h_id == "agent-hermes-k3s-primary" and h_name == "Hermes-01":
+            h_ag["name"] = "Hermes-K3s-Primary"
+            h_name = h_ag["name"]
+            changed = True
+
+        h_ep = h_ag.get("endpoint") or "http://192.168.0.17:7892"
+        c_ep = "http://192.168.0.81:30793" if ("k3s" in h_id.lower() or "30792" in h_ep or "cluster.local" in h_ep) else "http://192.168.0.17:7893"
+        c_model = "gemma4-claude:latest" if idx % 2 == 0 else "qwen2.5-coder:14b"
+
+        c_ag = agent_by_id.get(c_id)
+        if not c_ag:
+            c_ag = {
+                "id": c_id,
+                "name": c_default_name,
+                "role": f"Paired Claude Profitable Web Architect (🤝 {h_name})",
+                "department": "Profitable Web Ventures",
+                "reports_to": "agent-cto",
+                "adapter": "claude_bridge",
+                "endpoint": c_ep,
+                "model": c_model,
+                "status": "ONLINE",
+                "budget_tokens": 2000000,
+                "tokens_used": max(4200, int(h_ag.get("tokens_used", 0) * 0.85)),
+                "avatar": "✴️",
+                "partner_id": h_id,
+                "partner_name": h_name,
+                "coop_specialty": spec["vertical"],
+                "system_prompt": (
+                    f"You are {c_default_name}, dedicated 1-to-1 Claude Co-Op Partner to {h_name}. "
+                    f"Specialty: {spec['vertical']}. {spec['focus']} "
+                    f"Collaborate with {h_name} to architect, build, monetize (with Google AdSense ca-pub-1596056523034714), "
+                    f"and deploy unique, profitable interactive web applications to K3s dev."
+                ),
+            }
+            agents.append(c_ag)
+            agent_by_id[c_id] = c_ag
+            changed = True
+
+        # Ensure bi-directional pairing metadata is up to date on both Hermes and Claude agents
+        if h_ag.get("partner_id") != c_id or h_ag.get("partner_name") != c_ag.get("name") or h_ag.get("coop_specialty") != spec["vertical"]:
+            h_ag["partner_id"] = c_id
+            h_ag["partner_name"] = c_ag.get("name", c_default_name)
+            h_ag["coop_specialty"] = spec["vertical"]
+            changed = True
+
+        if c_ag.get("partner_id") != h_id or c_ag.get("partner_name") != h_name or c_ag.get("coop_specialty") != spec["vertical"]:
+            c_ag["partner_id"] = h_id
+            c_ag["partner_name"] = h_name
+            c_ag["coop_specialty"] = spec["vertical"]
+            if "🤝" not in c_ag.get("role", ""):
+                c_ag["role"] = f"{c_ag.get('role', 'Principal Claude Architect')} (🤝 {h_name})"
+            changed = True
+
+    return changed
 
 
 def save_state(state: Dict[str, Any]) -> None:
@@ -857,6 +976,8 @@ async def save_agent(payload: Dict[str, Any] = Body(...)):
             break
     if not replaced:
         state["agents"].append(new_agent)
+
+    ensure_every_hermes_has_claude_partner(state)
 
     action_word = "Updated" if replaced else "Dispatched new"
     add_audit(
@@ -1415,16 +1536,19 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                 ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 agent["status"] = "ONLINE"
                 agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+                partner_hermes_name = agent.get("partner_name") or "Hermes-01"
                 if collaborate_flag:
-                    hermes_ag = next((a for a in state["agents"] if a["id"] in ("agent-hermes-17", "agent-hermes")), None)
+                    partner_hid = agent.get("partner_id")
+                    hermes_ag = next((a for a in state["agents"] if a["id"] == partner_hid), None) or next((a for a in state["agents"] if a["id"] in ("agent-hermes-17", "agent-hermes")), None)
                     if hermes_ag:
                         hermes_ag["tokens_used"] = hermes_ag.get("tokens_used", 0) + max(120, ticket["tokens"] // 3)
+                        partner_hermes_name = hermes_ag.get("name", partner_hermes_name)
 
                 c_log = c_res.get("completion_log") or {
                     "id": f"clog-{str(uuid.uuid4())[:8]}",
                     "ticket_id": ticket_id,
                     "title": ticket["title"],
-                    "agent_name": f"{agent['name']} + Hermes Co-Op" if collaborate_flag else agent["name"],
+                    "agent_name": f"{agent['name']} 🤝 {partner_hermes_name}" if collaborate_flag else agent["name"],
                     "node_id": state.get("active_claude_node_id", "claude-host-17"),
                     "model": ticket["model_used"],
                     "tokens": ticket["tokens"],
@@ -1432,13 +1556,16 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                     "duration_ms": ticket["duration_ms"],
                     "completed_at": ticket["updated_at"],
                     "learned_skill": c_res.get("learned_skill", "claude-hermes-coop"),
-                    "memory_summary": f"Claude ({agent['name']}) {'& Hermes ' if collaborate_flag else ''}completed {ticket_id}.",
+                    "memory_summary": f"Claude ({agent['name']}) {'& ' + partner_hermes_name + ' ' if collaborate_flag else ''}completed {ticket_id}.",
                     "steps": [
                         {"step": "Claude Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']}"},
-                        {"step": "Anthropic /v1/messages", "time": "0.5s", "detail": f"Executed via {ticket['model_used']}" + (" + Hermes Co-Op" if collaborate_flag else "")},
+                        {"step": "Anthropic /v1/messages", "time": "0.5s", "detail": f"Executed via {ticket['model_used']}" + (f" + {partner_hermes_name} Co-Op" if collaborate_flag else "")},
                     ],
                     "status": "SUCCESS",
                 }
+                if collaborate_flag and c_log:
+                    c_log["agent_name"] = f"{agent['name']} 🤝 {partner_hermes_name}"
+                    c_log["collaborated"] = True
                 ticket["hermes_log"] = c_log
                 state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
                 state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
@@ -1609,28 +1736,35 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
 
                 h_res = await asyncio.to_thread(_call_hermes)
 
-                # If collaborate_flag is enabled, have Claude work together with Hermes on the deliverable!
+                # If collaborate_flag is enabled, have this Hermes agent's dedicated paired Claude agent collaborate!
                 claude_coop_output = ""
                 claude_coop_tokens = 0
                 claude_coop_dur = 0.0
                 claude_coop_model = "gemma4-claude:latest"
+                partner_cid = agent.get("partner_id")
+                claude_ag = (
+                    next((a for a in state.get("agents", []) if a.get("id") == partner_cid), None)
+                    or next((a for a in state.get("agents", []) if a.get("adapter") == "claude_bridge" or "claude" in a.get("id", "")), None)
+                )
+                claude_partner_name = (claude_ag.get("name") if claude_ag else None) or agent.get("partner_name") or "Claude-01"
+                claude_specialty = (claude_ag.get("coop_specialty") if claude_ag else None) or agent.get("coop_specialty") or "Profitable Web Architecture & Monetization"
                 if collaborate_flag:
-                    claude_ag = next((a for a in state.get("agents", []) if a.get("adapter") == "claude_bridge" or "claude" in a.get("id", "")), None)
                     claude_coop_model = (claude_ag.get("model") if claude_ag else None) or "gemma4-claude:latest"
                     coop_prompt = (
-                        f"🤝 [HERMES ⇄ CLAUDE JOINT SWARM COLLABORATION]\n"
+                        f"🤝 [HERMES ({agent['name']}) ⇄ CLAUDE ({claude_partner_name}) DEDICATED DYAD COLLABORATION]\n"
+                        f"Dyad Specialty: {claude_specialty}\n"
                         f"Ticket [{ticket['id']}]: {ticket['title']}\n"
                         f"Task Description: {ticket['description']}\n\n"
                         f"--- HERMES ({agent['name']}) DELIVERABLE ---\n{h_res.get('output', '')[:3000]}\n\n"
-                        f"As Claude (Principal Reasoning & Code Architect), review Hermes's solution, add architectural hardening, "
-                        f"edge-case safeguards, or code optimizations, and conclude with a 1-line 'Joint Swarm Synthesis'."
+                        f"As {claude_partner_name} (dedicated Claude partner to {agent['name']}), review and enhance {agent['name']}'s deliverable, "
+                        f"optimize for user engagement, conversion, AdSense monetization, and architectural excellence, and conclude with a 1-line 'Joint Dyad Synthesis'."
                     )
                     try:
                         c_coop_res = await asyncio.to_thread(
                             call_anthropic_messages,
                             state["ollama_url"],
                             claude_coop_model,
-                            "You are Claude-01 collaborating directly with Hermes in Sovereign AI Corp.",
+                            f"You are {claude_partner_name}, dedicated 1-to-1 Claude Co-Op Partner to {agent['name']} specializing in {claude_specialty}.",
                             coop_prompt,
                         )
                         claude_coop_output = c_coop_res.get("content", "")
@@ -1647,7 +1781,7 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                     ticket["output"] = (
                         f"## 🪽 Phase 1 — {agent['name']} (`{h_res.get('model', agent['model'])}`) Autonomous Execution\n\n"
                         f"{raw_h_out}\n\n---\n\n"
-                        f"## ✴️ Phase 2 — Claude (`{claude_coop_model}`) Co-Op Architectural Review & Hardening\n\n"
+                        f"## ✴️ Phase 2 — {claude_partner_name} (`{claude_coop_model}`) Dedicated Partner Co-Op & Profitable Web Synthesis\n\n"
                         f"{claude_coop_output}"
                     )
                 else:
@@ -1660,11 +1794,16 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                 agent["status"] = "ONLINE"
                 agent["tokens_used"] = agent.get("tokens_used", 0) + int(h_res.get("tokens", 250))
                 if claude_coop_tokens > 0:
-                    for ca in state["agents"]:
-                        if ca.get("adapter") == "claude_bridge" or "claude" in ca.get("id", ""):
-                            ca["tokens_used"] = ca.get("tokens_used", 0) + claude_coop_tokens
-                            break
-                
+                    target_cid = agent.get("partner_id")
+                    paired_ca = next((ca for ca in state["agents"] if ca.get("id") == target_cid), None)
+                    if paired_ca:
+                        paired_ca["tokens_used"] = paired_ca.get("tokens_used", 0) + claude_coop_tokens
+                    else:
+                        for ca in state["agents"]:
+                            if ca.get("adapter") == "claude_bridge" or "claude" in ca.get("id", ""):
+                                ca["tokens_used"] = ca.get("tokens_used", 0) + claude_coop_tokens
+                                break
+
                 # Attach rich Hermes + Claude Ticket Completion Log
                 matching_node = next((n for n in state.get("hermes_nodes", []) if n.get("endpoint") == hermes_ep), None)
                 matched_node_id = matching_node["node_id"] if matching_node else state.get("active_hermes_node_id", "hermes-host-17")
@@ -1676,7 +1815,7 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                         "id": f"hlog-{str(uuid.uuid4())[:8]}",
                         "ticket_id": ticket_id,
                         "title": ticket["title"],
-                        "agent_name": f"{agent['name']} + Claude Co-Op" if claude_coop_output else agent["name"],
+                        "agent_name": f"{agent['name']} 🤝 {claude_partner_name}" if claude_coop_output else agent["name"],
                         "node_id": matched_node_id,
                         "model": ticket["model_used"],
                         "tokens": ticket["tokens"],
@@ -1684,21 +1823,23 @@ async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
                         "duration_ms": ticket["duration_ms"],
                         "completed_at": ticket["updated_at"],
                         "learned_skill": h_res.get("learned_skill", "autonomous-ops"),
-                        "memory_summary": f"Completed ticket {ticket_id} ('{ticket['title']}') with Hermes {'& Claude Co-Op ' if claude_coop_output else ''}and synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}'.",
+                        "memory_summary": f"Completed ticket {ticket_id} ('{ticket['title']}') via {agent['name']} 🤝 {claude_partner_name} Co-Op and synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}'.",
                         "steps": [
-                            {"step": "Task Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']}"},
+                            {"step": "Task Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']} (paired with {claude_partner_name})"},
                             {"step": "Skills Vault Primed", "time": "0.2s", "detail": f"Primed with skills vault and episodic memory"},
                             {"step": "Hermes Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {h_res.get('tokens', 0)} tokens"},
-                            {"step": "Skill Synthesis", "time": f"{elapsed_s}s", "detail": f"Synthesized reusable skill '{h_res.get('learned_skill', 'autonomous-ops')}' into vault"},
+                            {"step": f"Claude ({claude_partner_name}) Co-Op", "time": f"{elapsed_s}s", "detail": f"{claude_partner_name} contributed {claude_coop_tokens} tokens & monetization synthesis"},
                         ],
                         "status": "SUCCESS",
+                        "collaborated": bool(claude_coop_output),
                     }
                 else:
                     c_log["node_id"] = matched_node_id
                     if claude_coop_output:
-                        c_log["agent_name"] = f"{agent['name']} + Claude Co-Op"
+                        c_log["agent_name"] = f"{agent['name']} 🤝 {claude_partner_name}"
                         c_log["model"] = ticket["model_used"]
                         c_log["tokens"] = ticket["tokens"]
+                        c_log["collaborated"] = True
                         c_log["duration_ms"] = ticket["duration_ms"]
                         c_log.setdefault("steps", []).append({
                             "step": "Claude Co-Op Review",
@@ -3032,6 +3173,46 @@ ADSENSE_FOOTER_UNIT = """
 
 AUTONOMOUS_APP_BLUEPRINTS: List[Dict[str, str]] = [
     {
+        "slug": "fintech-mortgage-compound-wealth-calc",
+        "title": "FinTech Mortgage Amortization & Compound Wealth Simulator",
+        "description": "Build a complete, high-converting, interactive single-page HTML5/CSS/JS FinTech web application (<!DOCTYPE html>...</html>) with live mortgage monthly payment breakdown (principal, interest, taxes, insurance), extra-payment payoff accelerator, 30-year compound investment growth chart, and high-RPM financial comparison cards.",
+    },
+    {
+        "slug": "ai-micro-saas-mrr-pricing-forecaster",
+        "title": "AI Micro-SaaS MRR, Churn & Token Margin Profit Calculator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS SaaS profitability web application (<!DOCTYPE html>...</html>) that models subscription tiers, customer acquisition cost (CAC), lifetime value (LTV), LLM API vs local Ollama GPU cost per user, net profit margin, and 24-month ARR trajectory.",
+    },
+    {
+        "slug": "real-estate-rental-caprate-cashflow",
+        "title": "Real Estate Rental Cashflow, Cap Rate & BRRRR ROI Analyzer",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS real estate investment web application (<!DOCTYPE html>...</html>) with live inputs for purchase price, down payment, rental income, vacancy rate, rehab cost, cash-on-cash return, cap rate, and 10-year equity appreciation chart.",
+    },
+    {
+        "slug": "ecommerce-roas-profit-margin-studio",
+        "title": "E-Commerce Shopify/FBA Profit Margin & Ad ROAS Optimizer",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS e-commerce profitability web application (<!DOCTYPE html>...</html>) calculating unit COGS, fulfillment fees, break-even ROAS, target CPA, daily ad spend scaling simulator, and net monthly store profit.",
+    },
+    {
+        "slug": "seo-adsense-rpm-traffic-revenue-calc",
+        "title": "Website AdSense RPM, Affiliate Conversion & SEO Revenue Forecaster",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS publisher monetization web application (<!DOCTYPE html>...</html>) that calculates daily/monthly/annual revenue from Google AdSense pageviews, niche RPM ($15-$65), CTR, affiliate conversion rate, and organic SEO traffic growth.",
+    },
+    {
+        "slug": "solar-battery-payback-roi-estimator",
+        "title": "Residential Solar Array, Battery Storage & Utility ROI Calculator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS clean-energy financial web application (<!DOCTYPE html>...</html>) calculating kW system size, federal tax credit savings, monthly utility bill offset, payback period in years, and 25-year cumulative net profit.",
+    },
+    {
+        "slug": "crypto-defi-yield-arbitrage-matrix",
+        "title": "Quant Crypto Arbitrage, Staking APY & Impermanent Loss Simulator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS quantitative crypto & DeFi web application (<!DOCTYPE html>...</html>) with live cross-exchange spread profit calculator, gas/fee deduction, liquidity pool impermanent loss curve, and auto-compounding APY projector.",
+    },
+    {
+        "slug": "cloud-gpu-finops-tco-comparator",
+        "title": "Enterprise Cloud GPU vs Self-Hosted Ollama FinOps Savings Calculator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS B2B FinOps web application (<!DOCTYPE html>...</html>) comparing AWS/GCP/OpenAI token API costs against self-hosted RTX 5070/3060 K3s Ollama clusters with hardware break-even months and 3-year TCO savings.",
+    },
+    {
         "slug": "k3s-cluster-topology-radar",
         "title": "K3s Cluster Live Node & Pod Topology Radar",
         "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) for visualizing a 7-node Proxmox HA K3s cluster (k3s-cp-01..03, workers) with interactive pod status filters, live simulated latency ping matrix, CPU/RAM gauges, and node health inspector.",
@@ -3327,7 +3508,8 @@ def deploy_completed_ticket_to_k3s_dev(ticket_id: str) -> Optional[Dict[str, Any
     app_dir = os.path.join(DEV_APPS_DIR, slug)
     os.makedirs(app_dir, exist_ok=True)
 
-    agent_display = f"{agent.get('name', 'Claude-01')} + Hermes Co-Op" if ticket.get("collaborate") else agent.get("name", "Agent")
+    partner_label = agent.get("partner_name") or ("Hermes-01" if "claude" in agent.get("id", "").lower() else "Claude-01")
+    agent_display = f"{agent.get('name', 'Hermes-01')} 🤝 {partner_label} Co-Op" if ticket.get("collaborate") else agent.get("name", "Agent")
     html_doc = synthesize_interactive_webapp_html(
         title=ticket.get("title", "Autonomous App"),
         description=ticket.get("description", ""),
@@ -3425,8 +3607,9 @@ def build_next_autonomous_dev_app_sync(custom_title: str = "", custom_desc: str 
                     "description": base_bp["description"],
                 }
 
-        # Alternate between Claude-01, Hermes-01, Pixel, and Forge so the whole AI company builds sites together
-        rotation = ["agent-claude", "agent-hermes", "agent-coder"]
+        # Rotate across all paired Hermes <-> Claude dyads so every Hermes + Claude pair builds unique profitable sites
+        dyad_agents = [a.get("id") for a in state.get("agents", []) if a.get("partner_id")]
+        rotation = dyad_agents if dyad_agents else ["agent-hermes", "agent-claude", "agent-hermes-17", "agent-claude-17"]
         chosen_agent_id = agent_id or rotation[len(state.get("dev_apps", [])) % len(rotation)]
         if not any(a.get("id") == chosen_agent_id for a in state.get("agents", [])):
             chosen_agent_id = state["agents"][0]["id"]

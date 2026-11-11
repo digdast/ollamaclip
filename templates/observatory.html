@@ -984,9 +984,13 @@
       grid.innerHTML = agents.map(a => {
         const isClaude = (a.adapter || '').includes('claude') || a.name.toLowerCase().includes('claude');
         const isHermes = (a.adapter || '').includes('hermes') || a.name.toLowerCase().includes('hermes');
-        const partnerBadge = isClaude
-          ? `<span class="badge badge-coop">🤝 Co-Op Partner: Hermes-01</span>`
-          : (isHermes ? `<span class="badge badge-coop">🤝 Co-Op Partner: Claude-01</span>` : `<span class="badge">${escapeHtml(a.department || 'Executive')}</span>`);
+        const partnerLabel = a.partner_name || (isClaude ? 'Hermes-01' : (isHermes ? 'Claude-01' : ''));
+        const partnerBadge = partnerLabel
+          ? `<span class="badge badge-coop">🤝 1-to-1 Partner: ${escapeHtml(partnerLabel)}</span>`
+          : `<span class="badge">${escapeHtml(a.department || 'Executive')}</span>`;
+        const specialtyBanner = a.coop_specialty
+          ? `<div style="margin-top:8px;padding:6px 9px;border-radius:7px;background:rgba(217,119,87,0.12);border:1px solid rgba(217,119,87,0.35);font-size:11px;color:#fdba74;">💰 <strong>Profitable Web Niche:</strong> ${escapeHtml(a.coop_specialty)}</div>`
+          : '';
 
         const projectsHtml = (a.recent_projects || []).slice(0, 3).map(p => `
           <div class="project-pill">
@@ -1020,6 +1024,7 @@
                 <span class="badge">Model: ${escapeHtml(a.model)}</span>
                 ${a.endpoint ? `<a href="${escapeHtml(a.endpoint)}" target="_blank" class="badge badge-claude" style="text-decoration:none;">Console ↗</a>` : ''}
               </div>
+              ${specialtyBanner}
 
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;background:rgba(5,8,17,0.6);padding:8px 10px;border-radius:8px;text-align:center;">
                 <div>

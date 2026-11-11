@@ -1268,6 +1268,12 @@
         const opts = modelNames.map(m => `<option value="${m}" ${m === a.model ? 'selected' : ''}>${m}</option>`).join('');
         const mgr = st.agents.find(m => m.id === a.reports_to);
         const mgrLabel = mgr ? `${mgr.avatar} ${mgr.name}` : 'Board';
+        const partnerBlock = a.partner_name ? `
+          <div style="margin-top:6px; padding:6px 10px; border-radius:8px; background:linear-gradient(90deg, rgba(217,119,87,0.16), rgba(168,85,247,0.16)); border:1px solid rgba(217,119,87,0.45); font-size:11.5px; color:#fdba74;">
+            <div><strong>🤝 Paired 1-to-1 Co-Op Partner:</strong> ${escapeHtml(a.partner_name)}</div>
+            ${a.coop_specialty ? `<div style="font-size:10.5px; color:#cbd5e1; margin-top:2px;">💰 Vertical: ${escapeHtml(a.coop_specialty)}</div>` : ''}
+          </div>
+        ` : '';
         return `
           <div class="agent-card">
             <div class="agent-top">
@@ -1283,6 +1289,7 @@
             <div class="agent-meta">
               <div>Dept: <strong>${escapeHtml(a.department || 'Engineering')}</strong> • Reports to: <strong>${escapeHtml(mgrLabel)}</strong></div>
               <div style="margin-top:3px;">Adapter: <strong>${a.adapter}</strong> • Tokens: <strong>${(a.tokens_used || 0).toLocaleString()}</strong></div>
+              ${partnerBlock}
             </div>
             <div class="field" style="margin-bottom:10px;">
               <label>Assigned Ollama Model</label>
