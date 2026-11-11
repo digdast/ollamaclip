@@ -638,6 +638,21 @@
       </div>
     </div>
 
+    <!-- SECTION 2B: ACTIVE DYAD PROJECTS BOARD & INSTANT PROJECT BUILDER -->
+    <div class="panel" style="border-color:rgba(168,85,247,0.45);background:linear-gradient(145deg,rgba(13,19,36,0.96),rgba(36,16,68,0.35));">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <span>🔥 Active 1-to-1 <code>Hermes ⇄ Claude</code> Dyads — Projects Currently Being Built</span>
+          <span class="badge badge-coop" id="dyadCountBadge">4 Active Dyad Squads</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="newProjectTitleInput" class="input-box" placeholder="e.g. SaaS Churn & LTV Revenue Calculator..." style="width:270px;" />
+          <button class="btn btn-claude" id="buildProjectBtn" onclick="triggerBuildNewProject()">⚡ Dispatch &amp; Build Live Website Now</button>
+        </div>
+      </div>
+      <div class="agent-grid" id="dyadActiveBoardGrid"></div>
+    </div>
+
     <!-- SECTION 3: WHAT PROJECTS EACH AGENT IS WORKING ON RIGHT NOW -->
     <div class="panel">
       <div class="panel-hdr">
@@ -656,24 +671,31 @@
     <div class="panel">
       <div class="panel-hdr">
         <div class="panel-title">
-          <span>🌐 Live Websites &amp; Applications Deployed to K3s <code>dev</code> Namespace</span>
+          <span>🌐 Live Websites &amp; Applications Accomplished &amp; Deployed to K3s <code>dev</code></span>
           <span class="badge badge-emerald" id="devAppsCountBadge">0 Live Sites</span>
         </div>
         <div style="font-size:12.5px;color:var(--text-sub);">
-          Built autonomously by Claude-01 + Hermes-01 Co-Op and served live on K3s NodePort <code>30795</code> / <code>https://dev.ertechlab.com</code>.
+          Built autonomously by paired <code>Hermes ⇄ Claude</code> Co-Op squads and served live on K3s NodePort <code>30795</code> / <code>https://dev.ertechlab.com</code>.
         </div>
       </div>
       <div class="agent-grid" id="devSitesGrid"></div>
     </div>
 
-    <!-- SECTION 5: COMPLETE PROJECT & TICKET COLLABORATION HISTORY TABLE -->
+    <!-- SECTION 5: COMPLETE ACCOMPLISHMENTS & EXECUTION HISTORY (3 TABS: PROJECTS/TICKETS, SKILLS VAULT, MEMORIES/AUDIT) -->
     <div class="panel">
       <div class="panel-hdr">
-        <div class="panel-title">
-          <span>📜 Complete Project, Ticket &amp; Collaboration History</span>
-          <span class="badge" id="historyCountBadge">0 Records</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div class="panel-title">
+            <span>🏆 Complete History of Agent Accomplishments</span>
+            <span class="badge" id="historyCountBadge">0 Records</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="tabBtnHistory" onclick="switchAccomplishmentTab('history')" style="padding:6px 12px;font-size:12px;">📜 Completed Projects &amp; Tickets</button>
+            <button class="btn" id="tabBtnSkills" onclick="switchAccomplishmentTab('skills')" style="padding:6px 12px;font-size:12px;">🧠 Synthesized Skills &amp; Playbooks Vault</button>
+            <button class="btn" id="tabBtnMemories" onclick="switchAccomplishmentTab('memories')" style="padding:6px 12px;font-size:12px;">🗂️ Episodic Memories &amp; Audit Trail</button>
+          </div>
         </div>
-        <div class="filter-bar">
+        <div class="filter-bar" id="historyFilterBar">
           <select id="filterAgentSelect" class="input-box" onchange="renderHistoryTable()">
             <option value="ALL">All Agents &amp; Nodes</option>
             <option value="CLAUDE">✴️ Claude Agents Only</option>
@@ -684,12 +706,14 @@
           <input type="text" id="filterSearchInput" class="input-box" placeholder="🔍 Search project, ticket, model, skill..." oninput="renderHistoryTable()" style="width:250px;" />
         </div>
       </div>
-      <div class="history-table-wrap">
+
+      <!-- TAB 1: COMPLETED PROJECTS & TICKETS TABLE -->
+      <div class="history-table-wrap" id="tabPaneHistory">
         <table>
           <thead>
             <tr>
               <th>Ticket / Time</th>
-              <th>Project / Task Title</th>
+              <th>Project / Task Accomplished</th>
               <th>Assigned &amp; Collaborating Agents</th>
               <th>LLM Model(s)</th>
               <th>Resources (Tokens / Speed)</th>
@@ -699,6 +723,16 @@
           </thead>
           <tbody id="historyTableBody"></tbody>
         </table>
+      </div>
+
+      <!-- TAB 2: SYNTHESIZED SKILLS & PLAYBOOKS VAULT -->
+      <div id="tabPaneSkills" style="display:none;">
+        <div class="agent-grid" id="skillsVaultGrid"></div>
+      </div>
+
+      <!-- TAB 3: EPISODIC MEMORIES & GOVERNANCE AUDIT TRAIL -->
+      <div id="tabPaneMemories" style="display:none;">
+        <div class="agent-grid" id="memoriesVaultGrid"></div>
       </div>
     </div>
 
@@ -771,12 +805,148 @@
       renderKpis();
       renderCollaborationTopology();
       renderCollabStream();
+      renderDyadActiveBoard();
       renderAgentProjects();
       renderDevSites();
       renderHistoryTable();
+      renderSkillsAndMemories();
       drawAllCharts();
       document.getElementById('liveSyncStatus').textContent =
         `Live Telemetry Synced at ${obsData.timestamp} • ${obsData.summary.agents_count} Agents • ${obsData.summary.nodes_count} Worker Nodes • ${obsData.summary.dev_apps_count} K3s Dev Sites`;
+    }
+
+    function renderDyadActiveBoard() {
+      const grid = document.getElementById('dyadActiveBoardGrid');
+      const dyads = obsData.dyad_active_projects || [];
+      if (!grid) return;
+      document.getElementById('dyadCountBadge').textContent = `${dyads.length} Active Dyad Squads`;
+      grid.innerHTML = dyads.map(d => `
+        <div class="agent-card" style="border-color:rgba(168,85,247,0.4);">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+              <span class="badge badge-coop">🪽 ${escapeHtml(d.hermes_name)} 🤝 ✴️ ${escapeHtml(d.claude_name)}</span>
+              <span class="badge badge-emerald">${escapeHtml(d.status)}</span>
+            </div>
+            <div style="font-size:11.5px;color:#fdba74;margin-bottom:8px;">
+              💰 <strong>Vertical:</strong> ${escapeHtml(d.specialty)}
+            </div>
+            <div style="background:rgba(5,8,17,0.75);border:1px solid rgba(56,189,248,0.3);border-radius:8px;padding:10px;margin-bottom:8px;">
+              <div style="font-size:10.5px;color:var(--cyan);font-weight:700;text-transform:uppercase;">⚡ Current / Latest Project Built:</div>
+              <div style="font-size:13.5px;font-weight:800;color:#f8fafc;margin-top:3px;">${escapeHtml(d.current_project_title)}</div>
+              <div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;">Next in Pipeline: <strong>${escapeHtml(d.next_queued_project)}</strong></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-sub);display:flex;justify-content:space-between;">
+              <span>Accomplished: <strong style="color:var(--emerald);">${d.accomplished_count} projects</strong></span>
+              <span>Tokens: <strong style="color:var(--cyan);">${(d.tokens_used || 0).toLocaleString()}</strong></span>
+              <span>Skills: <strong style="color:var(--purple);">${d.skills_learned}</strong></span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            ${d.current_project_url ? `<a href="${escapeHtml(d.current_project_url)}" target="_blank" class="btn btn-emerald" style="flex:1;justify-content:center;padding:6px 10px;font-size:12px;">🚀 Open Latest Site ↗</a>` : ''}
+            <button class="btn btn-primary" style="flex:1;justify-content:center;padding:6px 10px;font-size:12px;" onclick="triggerBuildForDyad('${escapeHtml(d.hermes_id)}', '${escapeHtml(d.next_queued_project)}')">⚡ Build Next Project</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function triggerBuildNewProject() {
+      const inp = document.getElementById('newProjectTitleInput');
+      const title = (inp.value || '').trim();
+      const btn = document.getElementById('buildProjectBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Hermes ⇄ Claude Building Site...';
+      try {
+        await fetch('/api/build_project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        });
+        inp.value = '';
+        await fetchObservatory();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Dispatch & Build Live Website Now';
+      }
+    }
+
+    async function triggerBuildForDyad(agentId, title) {
+      const btn = document.getElementById('buildProjectBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = `⏳ Building '${title.slice(0, 26)}...'`;
+      }
+      try {
+        await fetch('/api/build_project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agentId, title })
+        });
+        await fetchObservatory();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚡ Dispatch & Build Live Website Now';
+        }
+      }
+    }
+
+    function switchAccomplishmentTab(tab) {
+      document.getElementById('tabPaneHistory').style.display = tab === 'history' ? 'block' : 'none';
+      document.getElementById('tabPaneSkills').style.display = tab === 'skills' ? 'block' : 'none';
+      document.getElementById('tabPaneMemories').style.display = tab === 'memories' ? 'block' : 'none';
+      document.getElementById('historyFilterBar').style.display = tab === 'history' ? 'flex' : 'none';
+      document.getElementById('tabBtnHistory').className = tab === 'history' ? 'btn btn-primary' : 'btn';
+      document.getElementById('tabBtnSkills').className = tab === 'skills' ? 'btn btn-primary' : 'btn';
+      document.getElementById('tabBtnMemories').className = tab === 'memories' ? 'btn btn-primary' : 'btn';
+    }
+
+    function renderSkillsAndMemories() {
+      const skillsGrid = document.getElementById('skillsVaultGrid');
+      const memGrid = document.getElementById('memoriesVaultGrid');
+      if (skillsGrid) {
+        const skills = obsData.all_skills || [];
+        skillsGrid.innerHTML = skills.map(sk => `
+          <div class="agent-card">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <strong style="color:var(--claude);font-size:14px;">🧠 ${escapeHtml(sk.name)}</strong>
+                <span class="badge badge-coop">${escapeHtml(sk.category || 'Playbook')} • Used ${sk.uses || 1}x</span>
+              </div>
+              <div style="font-size:12.5px;color:var(--text-main);line-height:1.45;">${escapeHtml(sk.description)}</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);font-family:monospace;">Synthesized: ${escapeHtml(sk.created_at || '')}</div>
+          </div>
+        `).join('');
+      }
+      if (memGrid) {
+        const mems = obsData.all_memories || [];
+        const audits = obsData.audit_logs || [];
+        memGrid.innerHTML = mems.slice(0, 18).map(m => `
+          <div class="agent-card">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span class="badge">${escapeHtml((m.tags || ['Episodic Memory']).join(', '))}</span>
+                <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">${escapeHtml(m.timestamp || '')}</span>
+              </div>
+              <div style="font-size:12.5px;color:var(--text-main);">${escapeHtml(m.summary)}</div>
+            </div>
+          </div>
+        `).concat(audits.slice(0, 12).map(a => `
+          <div class="agent-card" style="border-color:rgba(16,185,129,0.35);">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span class="badge badge-emerald">Audit • ${escapeHtml(a.actor || 'Swarm')}</span>
+                <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">${escapeHtml(a.timestamp || '')}</span>
+              </div>
+              <div style="font-size:12.5px;color:var(--text-main);">${escapeHtml(a.event)}</div>
+            </div>
+          </div>
+        `)).join('');
+      }
     }
 
     function renderKpis() {

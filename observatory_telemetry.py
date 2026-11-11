@@ -166,11 +166,20 @@ def build_observatory_payload(data_dir: str) -> Dict[str, Any]:
                 seen_skill_names.add(sname)
                 all_skills.append(sk)
 
-    total_memories = (
-        len(claude_state.get("memories", []))
-        + len(h17_claude.get("memories", []))
-        + len(hermes_state.get("memories", []))
-    )
+    all_memories: List[Dict[str, Any]] = []
+    seen_mem_ids = set()
+    for src_mems in [
+        claude_state.get("memories", []),
+        h17_claude.get("memories", []),
+        hermes_state.get("memories", []),
+        h17_hermes.get("memories", []),
+    ]:
+        for m in src_mems:
+            msum = m.get("summary", "")
+            if msum and msum not in seen_mem_ids:
+                seen_mem_ids.add(msum)
+                all_memories.append(m)
+    total_memories = len(all_memories)
 
     # Skills breakdown by category for Graph 4
     cat_map: Dict[str, Dict[str, Any]] = {}
@@ -432,6 +441,37 @@ def build_observatory_payload(data_dir: str) -> Dict[str, Any]:
                 ],
             })
 
+    # Build Active Dyad Projects Board showing what each Hermes <-> Claude pair is actively working on
+    dyad_active_projects = []
+    hermes_dyad_leads = [a for a in agents_detailed if "hermes" in a.get("id", "").lower() and a.get("partner_name")]
+    upcoming_blueprints = [
+        ("FinTech Mortgage Amortization & Compound Wealth Simulator", "fintech-mortgage-compound-wealth-calc"),
+        ("AI Micro-SaaS MRR, Churn & Token Margin Profit Calculator", "ai-micro-saas-mrr-pricing-forecaster"),
+        ("Real Estate Rental Cashflow, Cap Rate & BRRRR ROI Analyzer", "real-estate-rental-caprate-cashflow"),
+        ("E-Commerce Shopify/FBA Profit Margin & Ad ROAS Optimizer", "ecommerce-roas-profit-margin-studio"),
+        ("Website AdSense RPM, Affiliate Conversion & SEO Revenue Forecaster", "seo-adsense-rpm-traffic-revenue-calc"),
+        ("Residential Solar Array, Battery Storage & Utility ROI Calculator", "solar-battery-payback-roi-estimator"),
+    ]
+    for idx_d, h_lead in enumerate(hermes_dyad_leads):
+        bp_title, bp_slug = upcoming_blueprints[idx_d % len(upcoming_blueprints)]
+        latest_proj = (h_lead.get("recent_projects") or [None])[0]
+        dyad_active_projects.append({
+            "dyad_id": f"dyad-{idx_d + 1}",
+            "hermes_name": h_lead.get("name"),
+            "hermes_id": h_lead.get("id"),
+            "claude_name": h_lead.get("partner_name"),
+            "claude_id": h_lead.get("partner_id"),
+            "specialty": h_lead.get("coop_specialty", "Profitable Web Ventures"),
+            "models": f"{h_lead.get('model', 'qwen2.5-coder:14b')} + gemma4-claude:latest",
+            "status": "ACTIVE CO-OP BUILD" if idx_d == 0 else "CONTINUOUS PIPELINE",
+            "current_project_title": latest_proj["title"] if latest_proj else bp_title,
+            "current_project_url": latest_proj.get("dev_url", "") if latest_proj else f"/{bp_slug}/",
+            "next_queued_project": bp_title,
+            "accomplished_count": h_lead.get("projects_count", 0),
+            "tokens_used": h_lead.get("tokens_used", 0),
+            "skills_learned": h_lead.get("skills_count", 0),
+        })
+
     total_tokens = sum(int(a.get("tokens_used", 0)) for a in agents) or sum(r["tokens"] for r in history)
     avg_speed = round(sum(speeds) / len(speeds), 1) if speeds else 42.5
 
@@ -450,9 +490,13 @@ def build_observatory_payload(data_dir: str) -> Dict[str, Any]:
             "avg_tok_per_sec": avg_speed,
         },
         "resources": resources,
+        "dyad_active_projects": dyad_active_projects,
         "agents_detailed": agents_detailed,
         "dev_apps": dev_apps,
         "collaboration_events": collaboration_events,
         "history": history,
         "skills_breakdown": skills_breakdown,
+        "all_skills": all_skills[:60],
+        "all_memories": all_memories[:50],
+        "audit_logs": clip_state.get("audit_logs", [])[:40],
     }

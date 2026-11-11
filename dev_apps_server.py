@@ -9,9 +9,10 @@ import asyncio
 import json
 import os
 import time
+import urllib.request
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
@@ -81,6 +82,30 @@ async def api_observatory():
     return JSONResponse(content=data)
 
 
+@app.post("/api/build_project")
+async def api_build_project(payload: Dict[str, Any] = Body(default={})):
+    def _trigger():
+        for ep in ["http://paperclip.ai.svc.cluster.local:7891", "http://192.168.0.81:30791"]:
+            try:
+                req = urllib.request.Request(
+                    f"{ep}/api/dev/factory/build_now",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except Exception:
+                continue
+        return {"ok": False, "error": "Paperclip factory endpoint unreachable"}
+
+    res = await asyncio.to_thread(_trigger)
+    return JSONResponse(content=res)
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/projects", response_class=HTMLResponse)
+@app.get("/projects/", response_class=HTMLResponse)
 @app.get("/observatory", response_class=HTMLResponse)
 @app.get("/observatory/", response_class=HTMLResponse)
 @app.get("/swarm-observatory", response_class=HTMLResponse)
@@ -98,21 +123,7 @@ async def serve_app_ads_txt(slug: str):
     return PlainTextResponse(content=ADS_TXT_CONTENT, media_type="text/plain")
 
 
-@app.get("/{slug}", response_class=HTMLResponse)
-@app.get("/{slug}/", response_class=HTMLResponse)
-async def serve_deployed_app(slug: str):
-    safe_slug = "".join(c for c in slug if c.isalnum() or c in "-_").strip("-_")
-    idx_path = os.path.join(DEV_APPS_DIR, safe_slug, "index.html")
-    if not os.path.exists(idx_path):
-        return HTMLResponse(
-            content=f"<html><body style='background:#060913;color:#f8fafc;font-family:sans-serif;padding:40px;'><h2>404 — K3s Dev App '{safe_slug}' not found</h2><p><a href='/' style='color:#38bdf8;'>← Back to K3s Dev Namespace Portal</a></p></body></html>",
-            status_code=404,
-        )
-    with open(idx_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
-
-
-@app.get("/", response_class=HTMLResponse)
+@app.get("/portal", response_class=HTMLResponse)
 async def serve_portal():
     apps = load_dev_apps()
     cards_html = ""
@@ -198,6 +209,20 @@ async def serve_portal():
 </body>
 </html>"""
     return HTMLResponse(content=html_doc)
+
+
+@app.get("/{slug}", response_class=HTMLResponse)
+@app.get("/{slug}/", response_class=HTMLResponse)
+async def serve_deployed_app(slug: str):
+    safe_slug = "".join(c for c in slug if c.isalnum() or c in "-_").strip("-_")
+    idx_path = os.path.join(DEV_APPS_DIR, safe_slug, "index.html")
+    if not os.path.exists(idx_path):
+        return HTMLResponse(
+            content=f"<html><body style='background:#060913;color:#f8fafc;font-family:sans-serif;padding:40px;'><h2>404 — K3s Dev App '{safe_slug}' not found</h2><p><a href='/' style='color:#38bdf8;'>← Back to K3s Dev Namespace Portal</a></p></body></html>",
+            status_code=404,
+        )
+    with open(idx_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 
 if __name__ == "__main__":
