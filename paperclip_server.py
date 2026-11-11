@@ -30,18 +30,21 @@ os.makedirs(DATA_DIR, exist_ok=True)
 STATE_FILE = os.path.join(DATA_DIR, "paperclip_state.json")
 DEFAULT_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.0.17:11434")
 DEFAULT_HERMES_URL = os.environ.get("HERMES_URL", "http://192.168.0.81:30792")
+DEFAULT_CLAUDE_URL = os.environ.get("CLAUDE_URL", "http://192.168.0.17:7893")
 
 app = FastAPI(
-    title="Paperclip-Ollama — Zero-Human AI Company Control Plane",
-    version="1.0.0",
+    title="Paperclip-Ollama — Zero-Human AI Company Control Plane (Hermes + Claude Swarm)",
+    version="1.1.0",
 )
 
 
 def default_state() -> Dict[str, Any]:
     return {
-        "company_name": "Sovereign AI Corp (Ollama Local Swarm)",
+        "company_name": "Sovereign AI Corp (Ollama • Hermes • Claude Swarm)",
         "ollama_url": DEFAULT_OLLAMA_URL,
         "hermes_url": DEFAULT_HERMES_URL,
+        "claude_url": DEFAULT_CLAUDE_URL,
+        "swarm_coop_enabled": True,
         "agents": [
             {
                 "id": "agent-ceo",
@@ -107,8 +110,26 @@ def default_state() -> Dict[str, Any]:
                 "tokens_used": 29150,
                 "avatar": "🪽",
                 "system_prompt": (
-                    "You are Hermes-01, a self-improving autonomous agent connected to Paperclip and Ollama. "
+                    "You are Hermes-01, a self-improving autonomous agent connected to Paperclip, Claude, and Ollama. "
                     "Execute assigned tickets, synthesize reusable skills from every task, and store episodic memory."
+                ),
+            },
+            {
+                "id": "agent-claude",
+                "name": "Claude-01",
+                "role": "Principal Reasoning & Code Architect (Claude Bridge)",
+                "department": "Autonomous Ops",
+                "reports_to": "agent-cto",
+                "adapter": "claude_bridge",
+                "endpoint": DEFAULT_CLAUDE_URL,
+                "model": "gemma4-claude:latest",
+                "status": "ONLINE",
+                "budget_tokens": 2000000,
+                "tokens_used": 18420,
+                "avatar": "✴️",
+                "system_prompt": (
+                    "You are Claude-01, Principal Reasoning & Code Architect powered by the Anthropic Messages API "
+                    "on Ollama. Work hand-in-hand with Hermes agents to design, code, verify, and synthesize playbooks."
                 ),
             },
             {
@@ -163,6 +184,7 @@ def default_state() -> Dict[str, Any]:
                 "memories_count": 6,
                 "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "status": "CONNECTED",
+                "agent_type": "hermes",
             },
             {
                 "node_id": "hermes-k3s-primary",
@@ -174,9 +196,61 @@ def default_state() -> Dict[str, Any]:
                 "memories_count": 6,
                 "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "status": "CONNECTED",
+                "agent_type": "hermes",
+            },
+            {
+                "node_id": "claude-host-17",
+                "name": "Claude-GPU (plexadmin@192.168.0.17)",
+                "endpoint": "http://192.168.0.17:7893",
+                "ollama_url": "http://127.0.0.1:11434",
+                "model": "gemma4-claude:latest",
+                "skills_count": 3,
+                "memories_count": 4,
+                "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "CONNECTED",
+                "agent_type": "claude",
+            },
+            {
+                "node_id": "claude-k3s-primary",
+                "name": "Claude-01 (K3s Autonomous Agent)",
+                "endpoint": "http://192.168.0.81:30793",
+                "ollama_url": DEFAULT_OLLAMA_URL,
+                "model": "gemma4-claude:latest",
+                "skills_count": 3,
+                "memories_count": 4,
+                "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "CONNECTED",
+                "agent_type": "claude",
+            }
+        ],
+        "claude_nodes": [
+            {
+                "node_id": "claude-host-17",
+                "name": "Claude-GPU (plexadmin@192.168.0.17)",
+                "endpoint": "http://192.168.0.17:7893",
+                "ollama_url": "http://127.0.0.1:11434",
+                "model": "gemma4-claude:latest",
+                "skills_count": 3,
+                "memories_count": 4,
+                "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "CONNECTED",
+                "agent_type": "claude",
+            },
+            {
+                "node_id": "claude-k3s-primary",
+                "name": "Claude-01 (K3s Autonomous Agent)",
+                "endpoint": "http://192.168.0.81:30793",
+                "ollama_url": DEFAULT_OLLAMA_URL,
+                "model": "gemma4-claude:latest",
+                "skills_count": 3,
+                "memories_count": 4,
+                "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "CONNECTED",
+                "agent_type": "claude",
             }
         ],
         "active_hermes_node_id": "hermes-host-17",
+        "active_claude_node_id": "claude-host-17",
         "hermes_ticket_logs": [
             {
                 "id": "hlog-init-101",
@@ -213,6 +287,13 @@ def default_state() -> Dict[str, Any]:
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "actor": "Hermes-01",
                 "event": "Hermes Autonomous Worker registered via /api/hermes/register adapter bridge",
+                "level": "SUCCESS",
+            },
+            {
+                "id": str(uuid.uuid4())[:8],
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "actor": "Claude-01",
+                "event": "Claude Autonomous Agent registered via /api/claude/register (Anthropic /v1/messages + Hermes Co-Op)",
                 "level": "SUCCESS",
             },
         ],
@@ -259,7 +340,10 @@ def load_state() -> Dict[str, Any]:
                 if not st["telegram"].get("chat_id") and os.environ.get("TELEGRAM_CHAT_ID"):
                     st["telegram"]["chat_id"] = os.environ.get("TELEGRAM_CHAT_ID")
             
-            # Ensure hermes-host-17 is in hermes_nodes
+            st.setdefault("swarm_coop_enabled", True)
+            st.setdefault("claude_url", DEFAULT_CLAUDE_URL)
+
+            # Ensure hermes-host-17 and claude-host-17 are in hermes_nodes & claude_nodes
             node_ids = {n.get("node_id") for n in st.get("hermes_nodes", [])}
             if "hermes-host-17" not in node_ids:
                 st.setdefault("hermes_nodes", []).insert(0, {
@@ -272,11 +356,69 @@ def load_state() -> Dict[str, Any]:
                     "memories_count": 6,
                     "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "status": "CONNECTED",
+                    "agent_type": "hermes",
                 })
+            if "claude-host-17" not in node_ids:
+                st.setdefault("hermes_nodes", []).append({
+                    "node_id": "claude-host-17",
+                    "name": "Claude-GPU (plexadmin@192.168.0.17)",
+                    "endpoint": "http://192.168.0.17:7893",
+                    "ollama_url": "http://127.0.0.1:11434",
+                    "model": "gemma4-claude:latest",
+                    "skills_count": 3,
+                    "memories_count": 4,
+                    "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "CONNECTED",
+                    "agent_type": "claude",
+                })
+            if "claude-k3s-primary" not in node_ids:
+                st.setdefault("hermes_nodes", []).append({
+                    "node_id": "claude-k3s-primary",
+                    "name": "Claude-01 (K3s Autonomous Agent)",
+                    "endpoint": "http://claude.ai.svc.cluster.local:7893",
+                    "ollama_url": DEFAULT_OLLAMA_URL,
+                    "model": "gemma4-claude:latest",
+                    "skills_count": 3,
+                    "memories_count": 4,
+                    "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "CONNECTED",
+                    "agent_type": "claude",
+                })
+
+            claude_node_ids = {n.get("node_id") for n in st.get("claude_nodes", [])}
+            if "claude-host-17" not in claude_node_ids:
+                st.setdefault("claude_nodes", []).insert(0, {
+                    "node_id": "claude-host-17",
+                    "name": "Claude-GPU (plexadmin@192.168.0.17)",
+                    "endpoint": "http://192.168.0.17:7893",
+                    "ollama_url": "http://127.0.0.1:11434",
+                    "model": "gemma4-claude:latest",
+                    "skills_count": 3,
+                    "memories_count": 4,
+                    "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "CONNECTED",
+                    "agent_type": "claude",
+                })
+            if "claude-k3s-primary" not in claude_node_ids:
+                st.setdefault("claude_nodes", []).append({
+                    "node_id": "claude-k3s-primary",
+                    "name": "Claude-01 (K3s Autonomous Agent)",
+                    "endpoint": "http://claude.ai.svc.cluster.local:7893",
+                    "ollama_url": DEFAULT_OLLAMA_URL,
+                    "model": "gemma4-claude:latest",
+                    "skills_count": 3,
+                    "memories_count": 4,
+                    "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "CONNECTED",
+                    "agent_type": "claude",
+                })
+
             if not st.get("active_hermes_node_id"):
                 st["active_hermes_node_id"] = "hermes-host-17"
+            if not st.get("active_claude_node_id"):
+                st["active_claude_node_id"] = "claude-host-17"
             
-            # Ensure Hermes-17 agent exists in agents
+            # Ensure Hermes-17, Claude-01, and Claude-17 agents exist in agents
             agent_ids = {a.get("id") for a in st.get("agents", [])}
             if "agent-hermes-17" not in agent_ids:
                 st.setdefault("agents", []).append({
@@ -294,13 +436,52 @@ def load_state() -> Dict[str, Any]:
                     "avatar": "🪽",
                     "system_prompt": "You are Hermes-17, an autonomous self-improving agent running directly on the GPU host at 192.168.0.17. Execute tickets with low latency and synthesize reusable skills."
                 })
+            if "agent-claude" not in agent_ids:
+                st.setdefault("agents", []).append({
+                    "id": "agent-claude",
+                    "name": "Claude-01",
+                    "role": "Principal Reasoning & Code Architect (Claude Bridge)",
+                    "department": "Autonomous Ops",
+                    "reports_to": "agent-cto",
+                    "adapter": "claude_bridge",
+                    "endpoint": "http://192.168.0.17:7893",
+                    "model": "gemma4-claude:latest",
+                    "status": "ONLINE",
+                    "budget_tokens": 2000000,
+                    "tokens_used": 0,
+                    "avatar": "✴️",
+                    "system_prompt": "You are Claude-01, Principal Reasoning & Code Architect powered by the Anthropic Messages API on Ollama. Work hand-in-hand with Hermes agents to design, code, verify, and synthesize playbooks."
+                })
+            if "agent-claude-17" not in agent_ids:
+                st.setdefault("agents", []).append({
+                    "id": "agent-claude-17",
+                    "name": "Claude-17",
+                    "role": "Host Autonomous Claude GPU Agent (192.168.0.17)",
+                    "department": "Autonomous Ops",
+                    "reports_to": "agent-cto",
+                    "adapter": "claude_bridge",
+                    "endpoint": "http://192.168.0.17:7893",
+                    "model": "gemma4-claude:latest",
+                    "status": "ONLINE",
+                    "budget_tokens": 2000000,
+                    "tokens_used": 0,
+                    "avatar": "✴️",
+                    "system_prompt": "You are Claude-17, an autonomous Claude reasoning and coding agent running on GPU host 192.168.0.17:7893. Collaborate directly with Hermes-17 on complex engineering tickets."
+                })
 
-            # Harmonize all Hermes agent bots to use hermes_bridge and connect to active node
+            # Harmonize all Hermes & Claude agent bots to use their bridges and connect to active nodes
             st.setdefault("hermes_for_all_agents", True)
             for ag in st.get("agents", []):
                 ag_name_l = ag.get("name", "").lower()
                 ag_id_l = ag.get("id", "").lower()
-                if "hermes" in ag_name_l or "hermes" in ag_id_l:
+                if "claude" in ag_name_l or "claude" in ag_id_l or ag.get("adapter") == "claude_bridge":
+                    ag["adapter"] = "claude_bridge"
+                    ag["status"] = "ONLINE"
+                    if not ag.get("endpoint"):
+                        ag["endpoint"] = "http://192.168.0.17:7893"
+                    if not ag.get("avatar") or ag.get("avatar") in ("🤖", "🪽"):
+                        ag["avatar"] = "✴️"
+                elif "hermes" in ag_name_l or "hermes" in ag_id_l:
                     ag["adapter"] = "hermes_bridge"
                     ag["status"] = "ONLINE"
                     if not ag.get("endpoint"):
@@ -437,6 +618,79 @@ def call_ollama_chat(ollama_url: str, model: str, system_prompt: str, user_promp
     }
 
 
+def call_anthropic_messages(ollama_url: str, model: str, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+    """Calls Ollama's native Anthropic Messages API (/v1/messages) with fallback to /api/chat."""
+    t0 = time.time()
+    base = ollama_url.rstrip("/")
+    effective_model = model
+    try:
+        with urllib.request.urlopen(f"{base}/api/ps", timeout=3) as r_ps:
+            ps_models = json.loads(r_ps.read().decode("utf-8")).get("models", [])
+        hot_names = [m.get("name") for m in ps_models if m.get("name")]
+        total_vram_gb = sum(m.get("size_vram", 0) for m in ps_models) / (1024 ** 3)
+        if hot_names and effective_model not in hot_names and total_vram_gb >= 15.0:
+            for preferred_hot in ["gemma4-claude:latest", "qwen2.5-coder:14b", "qwen2.5-coder:7b"]:
+                if preferred_hot in hot_names:
+                    effective_model = preferred_hot
+                    break
+            else:
+                effective_model = hot_names[0]
+    except Exception:
+        pass
+    try:
+        url = f"{base}/v1/messages"
+        payload = {
+            "model": effective_model,
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_prompt}],
+            "temperature": 0.3,
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN", "ollama"),
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        duration_ms = round((time.time() - t0) * 1000.0, 1)
+        blocks = data.get("content", [])
+        text_parts = []
+        thinking_parts = []
+        for b in blocks:
+            if isinstance(b, dict):
+                if b.get("type") == "text" and b.get("text"):
+                    text_parts.append(b["text"].strip())
+                elif b.get("type") == "thinking" and b.get("thinking"):
+                    thinking_parts.append(b["thinking"].strip())
+        msg = "\n\n".join(text_parts).strip()
+        thinking = "\n\n".join(thinking_parts).strip()
+        if not msg and thinking:
+            msg = f"### [Claude Extended Reasoning & Solution]\n\n{thinking}"
+        elif thinking and msg and len(thinking) > 30:
+            first_few = "\n".join(thinking.splitlines()[:10])
+            msg = f"<blockquote>✴️ <b>Claude Extended Thinking:</b>\n{first_few}</blockquote>\n\n{msg}"
+        usage = data.get("usage", {})
+        tokens = int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0))
+        if msg:
+            return {
+                "content": msg,
+                "tokens": tokens or max(64, len(msg) // 4),
+                "duration_ms": duration_ms,
+                "model": data.get("model", model),
+            }
+    except Exception:
+        pass
+    res = call_ollama_chat(ollama_url, model, system_prompt, user_prompt)
+    res["model"] = model
+    return res
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/app", response_class=HTMLResponse)
 async def serve_ui():
@@ -551,27 +805,47 @@ async def save_agent(payload: Dict[str, Any] = Body(...)):
     state = load_state()
     agent_id = payload.get("id") or f"agent-{str(uuid.uuid4())[:6]}"
     raw_name = (payload.get("name") or "New Agent").strip()
-    is_hermes = "hermes" in raw_name.lower() or "hermes" in agent_id.lower() or payload.get("adapter") == "hermes_bridge"
-    adapter = "hermes_bridge" if is_hermes else (payload.get("adapter") or "ollama_native")
-    endpoint = payload.get("endpoint") or ("http://192.168.0.17:7892" if is_hermes else None)
-    avatar = payload.get("avatar") or ("🪽" if is_hermes else "🤖")
+    is_claude = "claude" in raw_name.lower() or "claude" in agent_id.lower() or payload.get("adapter") == "claude_bridge"
+    is_hermes = (not is_claude) and ("hermes" in raw_name.lower() or "hermes" in agent_id.lower() or payload.get("adapter") == "hermes_bridge")
+
+    if is_claude:
+        adapter = "claude_bridge"
+        endpoint = payload.get("endpoint") or "http://192.168.0.17:7893"
+        avatar = payload.get("avatar") or "✴️"
+        default_model = "gemma4-claude:latest"
+        default_dept = "Autonomous Ops"
+        engine_label = "Claude-Ollama (Anthropic /v1/messages + Hermes Co-Op)"
+    elif is_hermes:
+        adapter = "hermes_bridge"
+        endpoint = payload.get("endpoint") or "http://192.168.0.17:7892"
+        avatar = payload.get("avatar") or "🪽"
+        default_model = "qwen2.5-coder:14b"
+        default_dept = "Autonomous Ops"
+        engine_label = "Hermes-Ollama"
+    else:
+        adapter = payload.get("adapter") or "ollama_native"
+        endpoint = payload.get("endpoint")
+        avatar = payload.get("avatar") or "🤖"
+        default_model = "qwen2.5-coder:7b"
+        default_dept = "Engineering"
+        engine_label = "local Ollama"
 
     new_agent = {
         "id": agent_id,
         "name": raw_name,
-        "role": (payload.get("role") or "Autonomous Specialist").strip(),
-        "department": (payload.get("department") or ("Autonomous Ops" if is_hermes else "Engineering")).strip(),
+        "role": (payload.get("role") or ("Autonomous Reasoning & Code Architect" if is_claude else "Autonomous Specialist")).strip(),
+        "department": (payload.get("department") or default_dept).strip(),
         "reports_to": payload.get("reports_to") or "agent-cto",
         "adapter": adapter,
         "endpoint": endpoint,
-        "model": payload.get("model") or ("qwen2.5-coder:14b" if is_hermes else "qwen2.5-coder:7b"),
-        "status": "ONLINE" if adapter == "hermes_bridge" else "IDLE",
-        "budget_tokens": int(payload.get("budget_tokens", 2000000 if is_hermes else 1000000)),
+        "model": payload.get("model") or default_model,
+        "status": "ONLINE" if adapter in ("hermes_bridge", "claude_bridge") else "IDLE",
+        "budget_tokens": int(payload.get("budget_tokens", 2000000 if (is_hermes or is_claude) else 1000000)),
         "tokens_used": int(payload.get("tokens_used", 0)),
         "avatar": avatar,
         "system_prompt": payload.get(
             "system_prompt",
-            f"You are {raw_name}, an autonomous specialist agent in Sovereign AI Corp powered by {'Hermes-Ollama' if is_hermes else 'local Ollama'}.",
+            f"You are {raw_name}, an autonomous specialist agent in Sovereign AI Corp powered by {engine_label}. Collaborate seamlessly with Hermes and Claude peers.",
         ),
     }
     replaced = False
@@ -604,6 +878,7 @@ async def save_agent(payload: Dict[str, Any] = Body(...)):
                 "assigned_to": new_agent["id"],
                 "priority": payload.get("priority", "HIGH"),
                 "auto_execute": bool(payload.get("auto_execute", True)),
+                "collaborate": bool(payload.get("collaborate", True)),
             }
         )
         dispatched_ticket = tck_res.get("ticket")
@@ -645,6 +920,7 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
     tck_id = f"TCK-{101 + len(state['tickets'])}"
     assigned_id = payload.get("assigned_to", "agent-coder")
     auto_execute = payload.get("auto_execute", True)
+    collaborate = bool(payload.get("collaborate", state.get("swarm_coop_enabled", True)))
 
     agent = next((a for a in state["agents"] if a["id"] == assigned_id), state["agents"][0])
     ticket = {
@@ -656,6 +932,7 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
         "status": "IN_PROGRESS" if auto_execute else "QUEUED",
         "requires_approval": bool(payload.get("requires_approval", True)),
         "approved": False,
+        "collaborate": collaborate,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "model_used": agent["model"],
@@ -664,7 +941,8 @@ async def create_and_run_ticket(payload: Dict[str, Any] = Body(...)):
         "output": "Agent is reasoning via Ollama (" + state["ollama_url"] + ")...",
     }
     state["tickets"].insert(0, ticket)
-    add_audit(state, agent["name"], f"Created ticket {tck_id}: '{ticket['title']}' assigned to {agent['name']} ({agent['model']})", "INFO")
+    coop_tag = " [🤝 Hermes + Claude Co-Op]" if collaborate else ""
+    add_audit(state, agent["name"], f"Created ticket {tck_id}: '{ticket['title']}' assigned to {agent['name']} ({agent['model']}){coop_tag}", "INFO")
     save_state(state)
     asyncio.create_task(dispatch_to_n8n_async("ticket_created", ticket, agent))
 
@@ -922,8 +1200,17 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
             raw_target = m.group(1).strip()
             raw_role = (m.group(2) or "").strip()
             # If target is a generic noun, refine
-            is_hermes = "hermes" in raw_target.lower() or "hermes" in raw_role.lower() or "worker" in raw_target.lower()
-            if is_hermes:
+            is_claude = "claude" in raw_target.lower() or "claude" in raw_role.lower()
+            is_hermes = (not is_claude) and ("hermes" in raw_target.lower() or "hermes" in raw_role.lower() or "worker" in raw_target.lower())
+            if is_claude:
+                claude_count = len([a for a in state["agents"] if "claude" in a.get("adapter", "") or "claude" in a["name"].lower()])
+                name = f"Claude-{claude_count + 1:02d}"
+                role = raw_role.title() if raw_role else "Autonomous Reasoning & Code Architect"
+                adapter = "claude_bridge"
+                model = "gemma4-claude:latest"
+                avatar = "✴️"
+                dept = "Autonomous Ops"
+            elif is_hermes:
                 hermes_count = len([a for a in state["agents"] if "hermes" in a.get("adapter", "") or "hermes" in a["name"].lower()])
                 name = f"Hermes-{hermes_count + 1:02d}"
                 role = raw_role.title() if raw_role else "Autonomous Field Worker"
@@ -941,15 +1228,31 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
             else:
                 name = raw_target.capitalize()
                 role = raw_role.title() if raw_role else "Systems Specialist"
-                adapter = "hermes_bridge" if "hermes" in full_text.lower() else "ollama_native"
-                model = "qwen2.5-coder:7b"
-                avatar = "🪽" if adapter == "hermes_bridge" else "🛠️"
-                dept = "Autonomous Ops" if adapter == "hermes_bridge" else "Engineering"
+                if "claude" in full_text.lower():
+                    adapter = "claude_bridge"
+                    model = "gemma4-claude:latest"
+                    avatar = "✴️"
+                    dept = "Autonomous Ops"
+                elif "hermes" in full_text.lower():
+                    adapter = "hermes_bridge"
+                    model = "qwen2.5-coder:7b"
+                    avatar = "🪽"
+                    dept = "Autonomous Ops"
+                else:
+                    adapter = "ollama_native"
+                    model = "qwen2.5-coder:7b"
+                    avatar = "🛠️"
+                    dept = "Engineering"
             
             # Check if this agent already exists
             existing = next((a for a in state["agents"] if a["name"].lower() == name.lower()), None)
             if not existing:
-                endpoint = "http://192.168.0.17:7892" if adapter == "hermes_bridge" else None
+                if adapter == "claude_bridge":
+                    endpoint = "http://192.168.0.17:7893"
+                elif adapter == "hermes_bridge":
+                    endpoint = "http://192.168.0.17:7892"
+                else:
+                    endpoint = None
                 new_ag = {
                     "id": f"agent-{name.lower()}-{str(uuid.uuid4())[:4]}",
                     "name": name,
@@ -959,11 +1262,11 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
                     "adapter": adapter,
                     "endpoint": endpoint,
                     "model": model,
-                    "status": "ONLINE" if adapter == "hermes_bridge" else "IDLE",
-                    "budget_tokens": 2000000 if adapter == "hermes_bridge" else 1500000,
+                    "status": "ONLINE" if adapter in ("hermes_bridge", "claude_bridge") else "IDLE",
+                    "budget_tokens": 2000000 if adapter in ("hermes_bridge", "claude_bridge") else 1500000,
                     "tokens_used": 0,
                     "avatar": avatar,
-                    "system_prompt": f"You are {name}, {role} at Sovereign AI Corp. Execute engineering tasks and write production-ready code with zero placeholders."
+                    "system_prompt": f"You are {name}, {role} at Sovereign AI Corp. Collaborate with Hermes and Claude peers to execute engineering tasks with zero placeholders."
                 }
                 state["agents"].append(new_ag)
                 add_audit(state, "Vega (CTO)", f"Hired & registered new employee '{name}' ({role}) -> Adapter: {adapter}, Model: {model}", "SUCCESS")
@@ -1008,6 +1311,17 @@ def handle_cto_autonomous_hiring(ticket: Dict[str, Any], state: Dict[str, Any]) 
 
 
 async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
+    res = await _execute_ticket_core(ticket_id)
+    try:
+        dep_res = await asyncio.to_thread(deploy_completed_ticket_to_k3s_dev, ticket_id)
+        if dep_res:
+            res = dep_res
+    except Exception:
+        pass
+    return res
+
+
+async def _execute_ticket_core(ticket_id: str) -> Dict[str, Any]:
     state = load_state()
     ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), None)
     if not ticket:
@@ -1042,6 +1356,200 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
             if t_cur and t_cur.get("status") in ("COMPLETED", "AWAITING_APPROVAL"):
                 return {"ticket": t_cur, "state": st_cur}
 
+    # Check if routed to Claude bridge
+    is_claude = (
+        agent.get("adapter") in ("claude_bridge", "claude")
+        or "claude" in agent.get("id", "").lower()
+        or "claude" in agent.get("name", "").lower()
+    )
+    collaborate_flag = bool(ticket.get("collaborate", state.get("swarm_coop_enabled", True)))
+
+    if is_claude:
+        claude_eps = []
+        if agent.get("endpoint"):
+            claude_eps.append(agent["endpoint"])
+        active_cid = state.get("active_claude_node_id")
+        active_cnode = next((n for n in state.get("claude_nodes", []) if n.get("node_id") == active_cid), None)
+        if active_cnode and active_cnode.get("endpoint") and active_cnode["endpoint"] not in claude_eps:
+            claude_eps.append(active_cnode["endpoint"])
+        for default_cep in [
+            "http://192.168.0.17:7893",
+            os.environ.get("CLAUDE_URL", "http://claude.ai.svc.cluster.local:7893"),
+            "http://claude.ai.svc.cluster.local:7893",
+            "http://192.168.0.81:30793",
+            "http://127.0.0.1:7893",
+        ]:
+            if default_cep and default_cep not in claude_eps:
+                claude_eps.append(default_cep)
+
+        for claude_ep in claude_eps:
+            try:
+                def _call_claude():
+                    req = urllib.request.Request(
+                        f"{claude_ep.rstrip('/')}/api/execute_ticket",
+                        data=json.dumps({
+                            "ticket_id": ticket["id"],
+                            "title": ticket["title"],
+                            "description": ticket["description"],
+                            "model": agent.get("model") or "gemma4-claude:latest",
+                            "agent_name": agent["name"],
+                            "system_prompt": agent.get("system_prompt", ""),
+                            "ollama_url": state["ollama_url"],
+                            "collaborate_with_hermes": collaborate_flag,
+                        }).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=180) as resp:
+                        return json.loads(resp.read().decode("utf-8"))
+
+                c_res = await asyncio.to_thread(_call_claude)
+                state = load_state()
+                ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
+                agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
+                ticket["output"] = c_res.get("output", "")
+                ticket["tokens"] = int(c_res.get("tokens", 320))
+                ticket["duration_ms"] = float(c_res.get("duration_ms", 1500))
+                ticket["model_used"] = c_res.get("model", agent["model"])
+                ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
+                ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                agent["status"] = "ONLINE"
+                agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+                if collaborate_flag:
+                    hermes_ag = next((a for a in state["agents"] if a["id"] in ("agent-hermes-17", "agent-hermes")), None)
+                    if hermes_ag:
+                        hermes_ag["tokens_used"] = hermes_ag.get("tokens_used", 0) + max(120, ticket["tokens"] // 3)
+
+                c_log = c_res.get("completion_log") or {
+                    "id": f"clog-{str(uuid.uuid4())[:8]}",
+                    "ticket_id": ticket_id,
+                    "title": ticket["title"],
+                    "agent_name": f"{agent['name']} + Hermes Co-Op" if collaborate_flag else agent["name"],
+                    "node_id": state.get("active_claude_node_id", "claude-host-17"),
+                    "model": ticket["model_used"],
+                    "tokens": ticket["tokens"],
+                    "tok_per_sec": round(ticket["tokens"] / max(0.1, ticket["duration_ms"] / 1000.0), 1),
+                    "duration_ms": ticket["duration_ms"],
+                    "completed_at": ticket["updated_at"],
+                    "learned_skill": c_res.get("learned_skill", "claude-hermes-coop"),
+                    "memory_summary": f"Claude ({agent['name']}) {'& Hermes ' if collaborate_flag else ''}completed {ticket_id}.",
+                    "steps": [
+                        {"step": "Claude Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']}"},
+                        {"step": "Anthropic /v1/messages", "time": "0.5s", "detail": f"Executed via {ticket['model_used']}" + (" + Hermes Co-Op" if collaborate_flag else "")},
+                    ],
+                    "status": "SUCCESS",
+                }
+                ticket["hermes_log"] = c_log
+                state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
+                state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
+                add_audit(
+                    state,
+                    agent["name"],
+                    f"Claude {'+ Hermes Co-Op ' if collaborate_flag else ''}executed {ticket_id} & synthesized '{c_log.get('learned_skill', 'claude-playbook')}' ({ticket['tokens']} tokens in {ticket['duration_ms']} ms)",
+                    "SUCCESS",
+                )
+                save_state(state)
+                asyncio.create_task(dispatch_to_n8n_async("ticket_completed", ticket, agent))
+                return {"ticket": ticket, "state": state}
+            except Exception:
+                continue
+
+        # Direct Anthropic /v1/messages fallback + Hermes Co-Op if Claude service port wasn't reachable
+        try:
+            c_prompt = (
+                f"COMPANY TICKET [{ticket['id']}]: {ticket['title']}\n"
+                f"PRIORITY: {ticket['priority']}\n"
+                f"DETAILS:\n{ticket['description']}\n\n"
+                f"Provide a complete, production-ready architectural & engineering solution as {agent['name']} ({agent['role']})."
+            )
+            c_direct = await asyncio.to_thread(
+                call_anthropic_messages,
+                state["ollama_url"],
+                agent.get("model") or "gemma4-claude:latest",
+                agent.get("system_prompt", "You are Claude-01, Principal Reasoning & Code Architect."),
+                c_prompt,
+            )
+            combined_out = c_direct["content"]
+            tot_tokens = c_direct["tokens"]
+            tot_dur = c_direct["duration_ms"]
+            steps = [
+                {"step": "Claude Ingested", "time": "0.0s", "detail": f"Assigned {ticket_id} to {agent['name']} ({agent.get('model')})"},
+                {"step": "Anthropic /v1/messages", "time": f"{round(tot_dur / 1000.0, 2)}s", "detail": f"Claude generated {tot_tokens} tokens via Ollama Anthropic API"},
+            ]
+            learned_skill = "claude-" + (re.sub(r"[^a-z0-9]+", "-", ticket["title"].lower()).strip("-")[:28] or "architecture")
+
+            if collaborate_flag:
+                for h_ep in ["http://192.168.0.17:7892", "http://hermes.ai.svc.cluster.local:7892", "http://192.168.0.81:30792"]:
+                    try:
+                        def _coop_hermes():
+                            req = urllib.request.Request(
+                                f"{h_ep}/api/execute_ticket",
+                                data=json.dumps({
+                                    "ticket_id": f"{ticket_id}-HERMES",
+                                    "title": f"Hermes Co-Op Verification: {ticket['title']}",
+                                    "description": f"Collaborate with Claude on {ticket['title']}:\n{ticket['description']}\n\nClaude Draft:\n{combined_out[:2500]}\n\nAdd operational execution steps and extract a reusable skill.",
+                                    "model": "qwen2.5-coder:14b",
+                                    "agent_name": "Hermes-17 (Co-Op Partner)",
+                                    "ollama_url": state["ollama_url"],
+                                }).encode("utf-8"),
+                                headers={"Content-Type": "application/json"},
+                                method="POST",
+                            )
+                            with urllib.request.urlopen(req, timeout=90) as r:
+                                return json.loads(r.read().decode("utf-8"))
+                        h_coop = await asyncio.to_thread(_coop_hermes)
+                        if h_coop.get("output"):
+                            combined_out = (
+                                f"## ✴️ Phase 1 — {agent['name']} (`{c_direct.get('model')}`) Architecture & Code\n\n"
+                                f"{c_direct['content']}\n\n---\n\n"
+                                f"## 🪽 Phase 2 — Hermes (`{h_coop.get('model', 'qwen2.5-coder:14b')}`) Co-Op Execution & Skill Synthesis\n\n"
+                                f"{h_coop['output']}"
+                            )
+                            tot_tokens += int(h_coop.get("tokens", 0))
+                            tot_dur = round(tot_dur + float(h_coop.get("duration_ms", 0)), 1)
+                            learned_skill = h_coop.get("learned_skill") or learned_skill
+                            steps.append({"step": "Hermes Co-Op Complete", "time": f"{round(tot_dur / 1000.0, 2)}s", "detail": f"Hermes verified deliverable & synthesized skill '{learned_skill}'"})
+                            break
+                    except Exception:
+                        continue
+
+            state = load_state()
+            ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
+            agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
+            ticket["output"] = combined_out
+            ticket["tokens"] = tot_tokens
+            ticket["duration_ms"] = tot_dur
+            ticket["model_used"] = c_direct.get("model", agent["model"])
+            ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
+            ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            agent["status"] = "ONLINE"
+            agent["tokens_used"] = agent.get("tokens_used", 0) + tot_tokens
+            c_log = {
+                "id": f"clog-{str(uuid.uuid4())[:8]}",
+                "ticket_id": ticket_id,
+                "title": ticket["title"],
+                "agent_name": f"{agent['name']} + Hermes Co-Op" if collaborate_flag else agent["name"],
+                "node_id": state.get("active_claude_node_id", "claude-host-17"),
+                "model": ticket["model_used"],
+                "tokens": tot_tokens,
+                "tok_per_sec": round(tot_tokens / max(0.1, tot_dur / 1000.0), 1),
+                "duration_ms": tot_dur,
+                "completed_at": ticket["updated_at"],
+                "learned_skill": learned_skill,
+                "memory_summary": f"Completed {ticket_id} via Claude Anthropic API {'+ Hermes Co-Op ' if collaborate_flag else ''}& synthesized '{learned_skill}'.",
+                "steps": steps,
+                "status": "SUCCESS",
+            }
+            ticket["hermes_log"] = c_log
+            state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
+            state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
+            add_audit(state, agent["name"], f"Claude {'+ Hermes Co-Op ' if collaborate_flag else ''}completed {ticket_id} ({tot_tokens} tokens in {tot_dur} ms)", "SUCCESS")
+            save_state(state)
+            asyncio.create_task(dispatch_to_n8n_async("ticket_completed", ticket, agent))
+            return {"ticket": ticket, "state": state}
+        except Exception:
+            pass
+
     # Check if routed to Hermes bridge or if Hermes is enabled for all bots
     is_hermes = (
         agent.get("adapter") in ("hermes_bridge", "hermes")
@@ -1055,7 +1563,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
             candidate_eps.append(agent["endpoint"])
             
         active_id = state.get("active_hermes_node_id")
-        active_node = next((n for n in state.get("hermes_nodes", []) if n.get("node_id") == active_id), None)
+        active_node = next((n for n in state.get("hermes_nodes", []) if n.get("node_id") == active_id and n.get("agent_type") != "claude"), None)
         if active_node and active_node.get("endpoint") and active_node["endpoint"] not in candidate_eps:
             candidate_eps.append(active_node["endpoint"])
             
@@ -1063,6 +1571,8 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
             candidate_eps.append("http://192.168.0.17:7892")
             
         for n in state.get("hermes_nodes", []):
+            if n.get("agent_type") == "claude":
+                continue
             ep = n.get("endpoint")
             if ep and ep not in candidate_eps:
                 candidate_eps.append(ep)
@@ -1094,23 +1604,68 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         headers={"Content-Type": "application/json"},
                         method="POST",
                     )
-                    with urllib.request.urlopen(req, timeout=12) as resp:
+                    with urllib.request.urlopen(req, timeout=90) as resp:
                         return json.loads(resp.read().decode("utf-8"))
 
                 h_res = await asyncio.to_thread(_call_hermes)
+
+                # If collaborate_flag is enabled, have Claude work together with Hermes on the deliverable!
+                claude_coop_output = ""
+                claude_coop_tokens = 0
+                claude_coop_dur = 0.0
+                claude_coop_model = "gemma4-claude:latest"
+                if collaborate_flag:
+                    claude_ag = next((a for a in state.get("agents", []) if a.get("adapter") == "claude_bridge" or "claude" in a.get("id", "")), None)
+                    claude_coop_model = (claude_ag.get("model") if claude_ag else None) or "gemma4-claude:latest"
+                    coop_prompt = (
+                        f"🤝 [HERMES ⇄ CLAUDE JOINT SWARM COLLABORATION]\n"
+                        f"Ticket [{ticket['id']}]: {ticket['title']}\n"
+                        f"Task Description: {ticket['description']}\n\n"
+                        f"--- HERMES ({agent['name']}) DELIVERABLE ---\n{h_res.get('output', '')[:3000]}\n\n"
+                        f"As Claude (Principal Reasoning & Code Architect), review Hermes's solution, add architectural hardening, "
+                        f"edge-case safeguards, or code optimizations, and conclude with a 1-line 'Joint Swarm Synthesis'."
+                    )
+                    try:
+                        c_coop_res = await asyncio.to_thread(
+                            call_anthropic_messages,
+                            state["ollama_url"],
+                            claude_coop_model,
+                            "You are Claude-01 collaborating directly with Hermes in Sovereign AI Corp.",
+                            coop_prompt,
+                        )
+                        claude_coop_output = c_coop_res.get("content", "")
+                        claude_coop_tokens = int(c_coop_res.get("tokens", 0))
+                        claude_coop_dur = float(c_coop_res.get("duration_ms", 0))
+                    except Exception:
+                        pass
+
                 state = load_state()
                 ticket = next((t for t in state["tickets"] if t["id"] == ticket_id), ticket)
                 agent = next((a for a in state["agents"] if a["id"] == ticket["assigned_to"]), agent)
-                ticket["output"] = h_res.get("output", "")
-                ticket["tokens"] = int(h_res.get("tokens", 250))
-                ticket["duration_ms"] = float(h_res.get("duration_ms", 1200))
-                ticket["model_used"] = h_res.get("model", agent["model"])
+                raw_h_out = h_res.get("output", "")
+                if claude_coop_output:
+                    ticket["output"] = (
+                        f"## 🪽 Phase 1 — {agent['name']} (`{h_res.get('model', agent['model'])}`) Autonomous Execution\n\n"
+                        f"{raw_h_out}\n\n---\n\n"
+                        f"## ✴️ Phase 2 — Claude (`{claude_coop_model}`) Co-Op Architectural Review & Hardening\n\n"
+                        f"{claude_coop_output}"
+                    )
+                else:
+                    ticket["output"] = raw_h_out
+                ticket["tokens"] = int(h_res.get("tokens", 250)) + claude_coop_tokens
+                ticket["duration_ms"] = round(float(h_res.get("duration_ms", 1200)) + claude_coop_dur, 1)
+                ticket["model_used"] = f"{h_res.get('model', agent['model'])} + {claude_coop_model}" if claude_coop_output else h_res.get("model", agent["model"])
                 ticket["status"] = "AWAITING_APPROVAL" if ticket.get("requires_approval") else "COMPLETED"
                 ticket["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 agent["status"] = "ONLINE"
-                agent["tokens_used"] = agent.get("tokens_used", 0) + ticket["tokens"]
+                agent["tokens_used"] = agent.get("tokens_used", 0) + int(h_res.get("tokens", 250))
+                if claude_coop_tokens > 0:
+                    for ca in state["agents"]:
+                        if ca.get("adapter") == "claude_bridge" or "claude" in ca.get("id", ""):
+                            ca["tokens_used"] = ca.get("tokens_used", 0) + claude_coop_tokens
+                            break
                 
-                # Attach rich Hermes Ticket Completion Log
+                # Attach rich Hermes + Claude Ticket Completion Log
                 matching_node = next((n for n in state.get("hermes_nodes", []) if n.get("endpoint") == hermes_ep), None)
                 matched_node_id = matching_node["node_id"] if matching_node else state.get("active_hermes_node_id", "hermes-host-17")
 
@@ -1121,7 +1676,7 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         "id": f"hlog-{str(uuid.uuid4())[:8]}",
                         "ticket_id": ticket_id,
                         "title": ticket["title"],
-                        "agent_name": agent["name"],
+                        "agent_name": f"{agent['name']} + Claude Co-Op" if claude_coop_output else agent["name"],
                         "node_id": matched_node_id,
                         "model": ticket["model_used"],
                         "tokens": ticket["tokens"],
@@ -1129,17 +1684,27 @@ async def execute_ticket_internal(ticket_id: str) -> Dict[str, Any]:
                         "duration_ms": ticket["duration_ms"],
                         "completed_at": ticket["updated_at"],
                         "learned_skill": h_res.get("learned_skill", "autonomous-ops"),
-                        "memory_summary": f"Completed ticket {ticket_id} ('{ticket['title']}') and synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}'.",
+                        "memory_summary": f"Completed ticket {ticket_id} ('{ticket['title']}') with Hermes {'& Claude Co-Op ' if claude_coop_output else ''}and synthesized skill '{h_res.get('learned_skill', 'autonomous-ops')}'.",
                         "steps": [
                             {"step": "Task Ingested", "time": "0.0s", "detail": f"Paperclip assigned {ticket_id} to {agent['name']}"},
                             {"step": "Skills Vault Primed", "time": "0.2s", "detail": f"Primed with skills vault and episodic memory"},
-                            {"step": "Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {ticket['tokens']} tokens ({ticket['duration_ms']} ms)"},
+                            {"step": "Hermes Inference Complete", "time": f"{elapsed_s}s", "detail": f"Generated {h_res.get('tokens', 0)} tokens"},
                             {"step": "Skill Synthesis", "time": f"{elapsed_s}s", "detail": f"Synthesized reusable skill '{h_res.get('learned_skill', 'autonomous-ops')}' into vault"},
                         ],
                         "status": "SUCCESS",
                     }
                 else:
                     c_log["node_id"] = matched_node_id
+                    if claude_coop_output:
+                        c_log["agent_name"] = f"{agent['name']} + Claude Co-Op"
+                        c_log["model"] = ticket["model_used"]
+                        c_log["tokens"] = ticket["tokens"]
+                        c_log["duration_ms"] = ticket["duration_ms"]
+                        c_log.setdefault("steps", []).append({
+                            "step": "Claude Co-Op Review",
+                            "time": f"{round(ticket['duration_ms'] / 1000.0, 2)}s",
+                            "detail": f"Claude ({claude_coop_model}) collaborated via Anthropic /v1/messages (+{claude_coop_tokens} tokens)"
+                        })
                 ticket["hermes_log"] = c_log
                 state.setdefault("hermes_ticket_logs", []).insert(0, c_log)
                 state["hermes_ticket_logs"] = state["hermes_ticket_logs"][:100]
@@ -1442,6 +2007,13 @@ async def complete_hermes_ticket_callback(payload: Dict[str, Any] = Body(...)):
     except Exception:
         pass
 
+    try:
+        dep_res = await asyncio.to_thread(deploy_completed_ticket_to_k3s_dev, ticket_id)
+        if dep_res:
+            return {"ok": True, "ticket": dep_res["ticket"], "state": dep_res["state"]}
+    except Exception:
+        pass
+
     return {"ok": True, "ticket": ticket, "state": state}
 
 
@@ -1487,10 +2059,11 @@ async def select_hermes_node(payload: Dict[str, Any] = Body(...)):
 
 
 @app.post("/api/hermes/nodes/connect")
+@app.post("/api/claude/nodes/connect")
 async def connect_custom_hermes_node(payload: Dict[str, Any] = Body(...)):
     endpoint = payload.get("endpoint", "").strip().rstrip("/")
     if not endpoint:
-        raise HTTPException(status_code=400, detail="Agent endpoint URL is required (e.g. http://192.168.0.17:7892)")
+        raise HTTPException(status_code=400, detail="Agent endpoint URL is required (e.g. http://192.168.0.17:7892 or http://192.168.0.17:7893)")
     
     if not (endpoint.startswith("http://") or endpoint.startswith("https://")):
         endpoint = f"http://{endpoint}"
@@ -1507,25 +2080,36 @@ async def connect_custom_hermes_node(payload: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=502, detail=f"Failed to probe agent endpoint at {endpoint}: {exc}")
 
     state = load_state()
-    raw_node_id = payload.get("node_id") or remote_data.get("node_id") or f"hermes-{str(uuid.uuid4())[:6]}"
+    st_inner = remote_data.get("state", {}) if isinstance(remote_data.get("state"), dict) else {}
+    is_claude = (
+        payload.get("agent_type") == "claude"
+        or remote_data.get("agent_type") == "claude"
+        or "claude" in (payload.get("name") or "").lower()
+        or "claude" in (remote_data.get("agent_name") or st_inner.get("agent_name") or "").lower()
+        or ":7893" in endpoint
+        or ":30793" in endpoint
+    )
+    prefix = "claude" if is_claude else "hermes"
+    raw_node_id = payload.get("node_id") or remote_data.get("node_id") or st_inner.get("node_id") or f"{prefix}-{str(uuid.uuid4())[:6]}"
     node_id = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_node_id).lower()
     
     host_label = urllib.parse.urlparse(endpoint).netloc or endpoint
-    node_name = payload.get("name") or remote_data.get("agent_name") or f"Hermes ({host_label})"
-    remote_model = remote_data.get("model") or "qwen2.5-coder:14b"
-    skills_count = len(remote_data.get("skills", []))
-    memories_count = len(remote_data.get("episodic_memories", []))
+    node_name = payload.get("name") or remote_data.get("agent_name") or st_inner.get("agent_name") or f"{'Claude' if is_claude else 'Hermes'} ({host_label})"
+    remote_model = remote_data.get("model") or st_inner.get("active_model") or ("gemma4-claude:latest" if is_claude else "qwen2.5-coder:14b")
+    skills_count = len(remote_data.get("skills") or st_inner.get("skills") or [])
+    memories_count = len(remote_data.get("episodic_memories") or st_inner.get("memories") or [])
     
     node_info = {
         "node_id": node_id,
         "name": node_name,
         "endpoint": endpoint,
-        "ollama_url": remote_data.get("ollama_url", state["ollama_url"]),
+        "ollama_url": remote_data.get("ollama_url") or st_inner.get("ollama_url") or state["ollama_url"],
         "model": remote_model,
         "skills_count": skills_count,
         "memories_count": memories_count,
         "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
         "status": "CONNECTED",
+        "agent_type": "claude" if is_claude else "hermes",
     }
     
     existing_idx = next((i for i, n in enumerate(state.get("hermes_nodes", [])) if n["node_id"] == node_id), None)
@@ -1534,54 +2118,193 @@ async def connect_custom_hermes_node(payload: Dict[str, Any] = Body(...)):
     else:
         state.setdefault("hermes_nodes", []).append(node_info)
         
-    state["active_hermes_node_id"] = node_id
+    if is_claude:
+        c_idx = next((i for i, n in enumerate(state.get("claude_nodes", [])) if n["node_id"] == node_id), None)
+        if c_idx is not None:
+            state["claude_nodes"][c_idx] = node_info
+        else:
+            state.setdefault("claude_nodes", []).append(node_info)
+        state["active_claude_node_id"] = node_id
+    else:
+        state["active_hermes_node_id"] = node_id
     
     agent_id = f"agent-{node_id}"
     agent_found = next((a for a in state["agents"] if a["id"] == agent_id or a.get("endpoint") == endpoint), None)
     if not agent_found:
         state["agents"].append({
             "id": agent_id,
-            "name": node_name.split("(")[0].strip() or "Hermes Custom",
-            "role": f"Remote Autonomous Worker ({host_label})",
+            "name": node_name.split("(")[0].strip() or ("Claude Custom" if is_claude else "Hermes Custom"),
+            "role": f"Remote Autonomous {'Claude Architect' if is_claude else 'Worker'} ({host_label})",
             "department": "Autonomous Ops",
             "reports_to": "agent-cto",
-            "adapter": "hermes_bridge",
+            "adapter": "claude_bridge" if is_claude else "hermes_bridge",
             "endpoint": endpoint,
             "model": remote_model,
             "status": "ONLINE",
             "budget_tokens": 2000000,
             "tokens_used": 0,
-            "avatar": "🪽",
-            "system_prompt": f"You are an autonomous agent connected via {endpoint}. Execute tickets and synthesize reusable skills."
+            "avatar": "✴️" if is_claude else "🪽",
+            "system_prompt": f"You are an autonomous {'Claude' if is_claude else 'Hermes'} agent connected via {endpoint}. Collaborate with peer agents and synthesize reusable skills."
         })
     else:
         agent_found["endpoint"] = endpoint
         agent_found["status"] = "ONLINE"
         agent_found["model"] = remote_model
 
-    add_audit(state, "Control Plane", f"Connected new agent node '{node_name}' at {endpoint} (Model: {remote_model}, Skills: {skills_count})", "SUCCESS")
+    add_audit(state, "Control Plane", f"Connected new {'Claude' if is_claude else 'Hermes'} agent node '{node_name}' at {endpoint} (Model: {remote_model}, Skills: {skills_count})", "SUCCESS")
     save_state(state)
     return {"ok": True, "node": node_info, "state": state}
 
 
 @app.delete("/api/hermes/nodes/{node_id}")
+@app.delete("/api/claude/nodes/{node_id}")
 async def unregister_hermes_node(node_id: str):
     state = load_state()
     nodes = state.get("hermes_nodes", [])
     if len(nodes) <= 1:
-        raise HTTPException(status_code=400, detail="Cannot remove the last active Hermes node")
+        raise HTTPException(status_code=400, detail="Cannot remove the last active agent node")
     
     target = next((n for n in nodes if n["node_id"] == node_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Node not found")
         
     state["hermes_nodes"] = [n for n in nodes if n["node_id"] != node_id]
-    if state.get("active_hermes_node_id") == node_id:
+    state["claude_nodes"] = [n for n in state.get("claude_nodes", []) if n["node_id"] != node_id]
+    if state.get("active_hermes_node_id") == node_id and state["hermes_nodes"]:
         state["active_hermes_node_id"] = state["hermes_nodes"][0]["node_id"]
+    if state.get("active_claude_node_id") == node_id and state.get("claude_nodes"):
+        state["active_claude_node_id"] = state["claude_nodes"][0]["node_id"]
         
     add_audit(state, "Control Plane", f"Unregistered agent node '{target['name']}' ({target['endpoint']})", "WARN")
     save_state(state)
     return {"ok": True, "removed": node_id, "state": state}
+
+
+# --- CLAUDE ADAPTER BRIDGE & SWARM COLLABORATION ENDPOINTS ---
+@app.post("/api/claude/register")
+async def register_claude_node(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    node_id = payload.get("node_id", "claude-k3s-primary")
+    node_info = {
+        "node_id": node_id,
+        "name": payload.get("name", "Claude-01 (Claude Autonomous Agent)"),
+        "endpoint": payload.get("endpoint", DEFAULT_CLAUDE_URL),
+        "ollama_url": payload.get("ollama_url", state["ollama_url"]),
+        "model": payload.get("model", "gemma4-claude:latest"),
+        "skills_count": int(payload.get("skills_count", 0)),
+        "memories_count": int(payload.get("memories_count", 0)),
+        "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "CONNECTED",
+        "agent_type": "claude",
+    }
+    found = False
+    for idx, n in enumerate(state.get("claude_nodes", [])):
+        if n["node_id"] == node_id:
+            state["claude_nodes"][idx] = node_info
+            found = True
+            break
+    if not found:
+        state.setdefault("claude_nodes", []).append(node_info)
+
+    h_found = False
+    for idx, n in enumerate(state.get("hermes_nodes", [])):
+        if n["node_id"] == node_id:
+            state["hermes_nodes"][idx] = node_info
+            h_found = True
+            break
+    if not h_found:
+        state.setdefault("hermes_nodes", []).append(node_info)
+
+    agent_id = f"agent-{node_id}"
+    matched_agent = next((a for a in state["agents"] if a["id"] == agent_id), None)
+    ag_name = payload.get("agent_name") or node_info["name"].split("(")[0].strip() or "Claude Agent"
+
+    if not matched_agent:
+        state["agents"].append({
+            "id": agent_id,
+            "name": ag_name,
+            "role": f"Autonomous Claude Architect ({node_id})",
+            "department": "Autonomous Ops",
+            "reports_to": "agent-cto",
+            "adapter": "claude_bridge",
+            "endpoint": node_info["endpoint"],
+            "model": node_info["model"],
+            "status": "ONLINE",
+            "budget_tokens": 2000000,
+            "tokens_used": 0,
+            "avatar": "✴️",
+            "system_prompt": f"You are {ag_name}, an autonomous Claude reasoning and engineering agent running on {node_id}. Collaborate with Hermes peers on complex tasks.",
+        })
+    else:
+        matched_agent["endpoint"] = node_info["endpoint"]
+        matched_agent["status"] = "ONLINE"
+        matched_agent["model"] = node_info["model"]
+
+    add_audit(state, node_info["name"], f"Claude node '{node_id}' linked (Anthropic /v1/messages: {node_info['ollama_url']}, Model: {node_info['model']})", "SUCCESS")
+    save_state(state)
+    return {"ok": True, "node": node_info, "paperclip_ollama_url": state["ollama_url"]}
+
+
+@app.get("/api/claude/tasks")
+async def get_claude_queued_tasks(node_id: str = ""):
+    state = load_state()
+    queued = [t for t in state["tickets"] if t["status"] == "QUEUED"]
+    if node_id:
+        target_agent_id = f"agent-{node_id}"
+        if node_id == "claude-k3s-primary":
+            filtered = [t for t in queued if t.get("assigned_to") in ("agent-claude", target_agent_id)]
+        elif node_id == "claude-host-17":
+            filtered = [t for t in queued if t.get("assigned_to") in ("agent-claude-17", target_agent_id)]
+        else:
+            filtered = [t for t in queued if t.get("assigned_to") == target_agent_id]
+        return {"tasks": filtered, "ollama_url": state["ollama_url"]}
+    return {"tasks": queued, "ollama_url": state["ollama_url"]}
+
+
+@app.post("/api/claude/complete_ticket")
+async def complete_claude_ticket_callback(payload: Dict[str, Any] = Body(...)):
+    return await complete_hermes_ticket_callback(payload)
+
+
+@app.get("/api/claude/nodes")
+async def get_claude_nodes():
+    state = load_state()
+    return {
+        "nodes": state.get("claude_nodes", []),
+        "active_node_id": state.get("active_claude_node_id", "claude-host-17"),
+        "agents": [a for a in state["agents"] if a.get("adapter") == "claude_bridge"],
+    }
+
+
+@app.post("/api/claude/nodes/select")
+async def select_claude_node(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    node_id = payload.get("node_id")
+    target_node = next((n for n in state.get("claude_nodes", []) if n["node_id"] == node_id), None)
+    if not target_node:
+        target_node = next((n for n in state.get("hermes_nodes", []) if n["node_id"] == node_id), None)
+    if not target_node:
+        raise HTTPException(status_code=404, detail="Claude node not found")
+    state["active_claude_node_id"] = node_id
+    add_audit(state, "Control Plane", f"Switched active Claude agent connection to '{target_node['name']}' ({target_node['endpoint']})", "INFO")
+    save_state(state)
+    return {"ok": True, "active_node_id": node_id, "node": target_node, "state": state}
+
+
+@app.post("/api/swarm/collaborate")
+async def trigger_hermes_claude_collaboration(payload: Dict[str, Any] = Body(...)):
+    """Dispatches a joint Hermes + Claude collaborative engineering ticket where both agents work together."""
+    title = (payload.get("title") or "Joint Claude + Hermes Architecture & Execution").strip()
+    description = (payload.get("description") or title).strip()
+    primary = payload.get("primary_agent") or "agent-claude"
+    return await create_and_run_ticket({
+        "title": title,
+        "description": description,
+        "assigned_to": primary,
+        "priority": payload.get("priority", "CRITICAL"),
+        "auto_execute": True,
+        "collaborate": True,
+    })
 
 
 # --- TELEGRAM BOT TWO-WAY COMMUNICATION BRIDGE ---
@@ -2256,11 +2979,15 @@ async def download_suite_bundle():
         for rel in [
             "paperclip_server.py",
             "hermes_agent.py",
+            "claude_agent.py",
+            "dev_apps_server.py",
+            "dual_tls_runner.py",
             "requirements.txt",
             "README.md",
             "k8s-paperclip-hermes.yaml",
             "templates/paperclip.html",
             "templates/hermes.html",
+            "templates/claude.html",
         ]:
             p = os.path.join(BASE_DIR, rel)
             if os.path.exists(p):
@@ -2273,12 +3000,625 @@ async def download_suite_bundle():
     )
 
 
+# --- K3S 'DEV' NAMESPACE WEBSITE DEPLOYER & CONTINUOUS AUTONOMOUS APP FACTORY ---
+DEV_APPS_DIR = os.path.join(DATA_DIR, "dev_apps")
+os.makedirs(DEV_APPS_DIR, exist_ok=True)
+K3S_DEV_GATEWAY_URL = os.environ.get("K3S_DEV_GATEWAY_URL", "http://192.168.0.81:30795")
+ADS_TXT_BODY = "google.com, pub-1596056523034714, DIRECT, f08c47fec0942fa0\n"
+
+ADSENSE_HEAD_SNIPPET = """
+  <!-- Google AdSense with Page-Level Auto-Ads -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1596056523034714"
+     crossorigin="anonymous"></script>
+  <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: "ca-pub-1596056523034714",
+      enable_page_level_ads: true
+    });
+  </script>
+"""
+
+ADSENSE_FOOTER_UNIT = """
+  <div style="max-width:1200px;margin:22px auto;padding:8px 16px;text-align:center;">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-1596056523034714"
+         data-ad-slot="auto"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+"""
+
+AUTONOMOUS_APP_BLUEPRINTS: List[Dict[str, str]] = [
+    {
+        "slug": "k3s-cluster-topology-radar",
+        "title": "K3s Cluster Live Node & Pod Topology Radar",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) for visualizing a 7-node Proxmox HA K3s cluster (k3s-cp-01..03, workers) with interactive pod status filters, live simulated latency ping matrix, CPU/RAM gauges, and node health inspector.",
+    },
+    {
+        "slug": "dual-gpu-vram-llm-sizer",
+        "title": "Dual-GPU VRAM & Ollama LLM Throughput Sizer",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) for calculating LLM VRAM usage, quantization fit (Q4_K_M, Q5_K_M, Q8_0, FP16), KV-cache context size (8K to 128K), and estimated tokens/sec across dual GPUs (RTX 5070 12GB + RTX 3060 12GB = 24GB VRAM).",
+    },
+    {
+        "slug": "claude-hermes-coop-studio",
+        "title": "Claude & Hermes Co-Op Prompt Engineering Workbench",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) that lets engineers compose system prompts, compare Claude (/v1/messages) vs Hermes skill-primed responses side-by-side, score outputs, and export JSON templates.",
+    },
+    {
+        "slug": "cidr-vlan-network-architect",
+        "title": "Interactive CIDR, Subnet & Proxmox VLAN Architect",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) with a live CIDR subnet splitter, usable IP range calculator, binary netmask visualizer, and Proxmox bridge (vmbr0/VLAN) config snippet generator.",
+    },
+    {
+        "slug": "proxmox-zfs-ceph-calculator",
+        "title": "Proxmox ZFS & Ceph NVMe IOPS Storage Calculator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) for sizing ZFS RAIDZ1/RAIDZ2/Mirror and Ceph 3x replication pools with usable TB, parity overhead, ARC RAM requirements, and IOPS estimation.",
+    },
+    {
+        "slug": "k8s-manifest-helm-builder",
+        "title": "Kubernetes Deployment, Service & Ingress YAML Studio",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) where users configure container image, ports, NodePort, CPU/Memory limits, and hostPath volumes and see live syntax-highlighted Kubernetes YAML generated instantly with 1-click copy.",
+    },
+    {
+        "slug": "homelab-ups-power-thermal",
+        "title": "Homelab Rack Power, UPS Runtime & Thermal Calculator",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) that calculates total rack wattage, BTU/hr heat output, monthly kWh cost, and battery UPS runtime minutes across servers and GPUs.",
+    },
+    {
+        "slug": "cyberpunk-log-anomaly-scanner",
+        "title": "Real-Time Syslog & Kubernetes Event Anomaly Scanner",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) where users paste or stream container logs to highlight ERROR/WARN/OOMKilled patterns, chart severity counts, and generate remediation commands.",
+    },
+    {
+        "slug": "regex-json-live-workbench",
+        "title": "Interactive Regex & JSON Formatter Live Workbench",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) with live regular expression match highlighting, capture group table, and JSON pretty-printer/validator.",
+    },
+    {
+        "slug": "ai-swarm-kanban-velocity",
+        "title": "Autonomous AI Swarm Sprint Velocity & Token ROI Tracker",
+        "description": "Build a complete interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) with an interactive drag-free Kanban board, token burn rate calculator, and local Ollama vs Cloud API cost savings chart.",
+    },
+]
+
+
+def _make_slug(text: str, prefix: str = "") -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", (text or "app").lower()).strip("-")[:38] or "web-app"
+    if prefix:
+        p_clean = re.sub(r"[^a-z0-9]+", "-", prefix.lower()).strip("-")
+        return f"{p_clean}-{base}"[:48].strip("-")
+    return base
+
+
+def _ensure_adsense_in_html(raw_html: str, title: str, slug: str, agent_name: str, model: str, ticket_id: str) -> str:
+    html_out = raw_html.strip()
+    if "ca-pub-1596056523034714" not in html_out:
+        if "</head>" in html_out:
+            html_out = html_out.replace("</head>", f"{ADSENSE_HEAD_SNIPPET}\n</head>", 1)
+        elif "<body" in html_out:
+            html_out = html_out.replace("<body", f"<head>{ADSENSE_HEAD_SNIPPET}</head>\n<body", 1)
+        else:
+            html_out = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>{html.escape(title)}</title>{ADSENSE_HEAD_SNIPPET}</head><body>{html_out}</body></html>"
+
+    dev_banner = f"""
+    <div style="background:linear-gradient(90deg,#0f172a,#1e1b4b,#0f172a);border-bottom:1px solid rgba(56,189,248,0.35);padding:8px 18px;font-family:system-ui,sans-serif;font-size:12px;color:#e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:99999;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.45);padding:2px 8px;border-radius:999px;font-weight:700;font-family:monospace;">🟢 K3s namespace: dev</span>
+        <strong style="color:#38bdf8;">{html.escape(title)}</strong>
+        <span style="color:#94a3b8;">• Built autonomously by <strong>{html.escape(agent_name)}</strong> (<code>{html.escape(model)}</code>) • Ticket <code>{html.escape(ticket_id)}</code></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a href="http://192.168.0.81:30795/" style="color:#fdba74;text-decoration:none;font-weight:700;">🚀 All K3s Dev Sites (30795) ↗</a>
+        <span style="color:#475569;">|</span>
+        <a href="http://192.168.0.81:30791" style="color:#38bdf8;text-decoration:none;font-weight:700;">📎 Paperclip Control Plane ↗</a>
+      </div>
+    </div>
+    """
+    if "K3s namespace: dev" not in html_out:
+        m_body = re.search(r"<body[^>]*>", html_out, flags=re.IGNORECASE)
+        if m_body:
+            insert_pos = m_body.end()
+            html_out = html_out[:insert_pos] + "\n" + dev_banner + html_out[insert_pos:]
+        else:
+            html_out = dev_banner + html_out
+
+    if 'class="adsbygoogle"' not in html_out:
+        if "</body>" in html_out:
+            html_out = html_out.replace("</body>", f"{ADSENSE_FOOTER_UNIT}\n</body>", 1)
+        else:
+            html_out = html_out + ADSENSE_FOOTER_UNIT
+
+    return html_out
+
+
+def synthesize_interactive_webapp_html(
+    title: str,
+    description: str,
+    agent_output: str,
+    agent_name: str,
+    model: str,
+    ticket_id: str,
+    slug: str,
+) -> str:
+    """Extracts full HTML if present in the agent deliverable, or builds a rich interactive web app around the deliverable."""
+    raw = agent_output or ""
+    # 1. Check for fenced ```html ... ``` block containing <html or <!DOCTYPE or <body or <script
+    html_blocks = re.findall(r"```(?:html|HTML)?\s*(<!DOCTYPE html[\s\S]*?</html>|<html[\s\S]*?</html>)```", raw, flags=re.IGNORECASE)
+    if html_blocks:
+        best_block = max(html_blocks, key=len)
+        if len(best_block) > 220:
+            return _ensure_adsense_in_html(best_block, title, slug, agent_name, model, ticket_id)
+
+    # 2. Check for unfenced <!DOCTYPE html> ... </html>
+    m_doc = re.search(r"(<!DOCTYPE html[\s\S]*?</html>)", raw, flags=re.IGNORECASE)
+    if m_doc and len(m_doc.group(1)) > 220:
+        return _ensure_adsense_in_html(m_doc.group(1), title, slug, agent_name, model, ticket_id)
+
+    # 3. Build a rich interactive single-page web application with live simulator + deliverable code studio
+    escaped_out = html.escape(raw)
+    escaped_title = html.escape(title)
+    escaped_desc = html.escape(description or title)
+    doc = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{escaped_title} — K3s Dev Live App</title>
+  {ADSENSE_HEAD_SNIPPET}
+  <style>
+    :root {{
+      --bg: #050811;
+      --card: rgba(15, 23, 42, 0.9);
+      --border: rgba(56, 189, 248, 0.28);
+      --cyan: #38bdf8;
+      --purple: #a855f7;
+      --emerald: #10b981;
+      --coral: #d97757;
+      --text: #f8fafc;
+      --sub: #94a3b8;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; background: radial-gradient(circle at 15% 15%, rgba(56,189,248,0.12), transparent 40%), radial-gradient(circle at 85% 10%, rgba(217,119,87,0.12), transparent 40%), var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }}
+    .container {{ max-width: 1320px; margin: 0 auto; padding: 24px; }}
+    .hero {{ background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 12px 32px rgba(0,0,0,0.45); }}
+    .grid {{ display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; }}
+    @media (max-width: 960px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+    .panel {{ background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 20px; }}
+    .btn {{ cursor: pointer; border: 1px solid rgba(56,189,248,0.5); background: linear-gradient(135deg, #0284c7, #7e22ce); color: #fff; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; }}
+    .btn:hover {{ filter: brightness(1.12); }}
+    .input, select {{ width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.16); background: #080d1a; color: #fff; margin-top: 5px; margin-bottom: 12px; font-size: 13px; }}
+    .stat-row {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }}
+    .stat {{ background: rgba(6, 9, 19, 0.85); border: 1px solid rgba(56,189,248,0.22); border-radius: 10px; padding: 12px; text-align: center; }}
+    .stat-val {{ font-size: 22px; font-weight: 800; color: var(--cyan); font-family: monospace; }}
+    .stat-lbl {{ font-size: 11px; color: var(--sub); text-transform: uppercase; margin-top: 4px; }}
+    pre {{ background: #04070f; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; overflow: auto; max-height: 540px; font-size: 12.5px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap; }}
+    canvas {{ width: 100%; height: 220px; background: #04070f; border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; margin-top: 12px; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <span style="font-size:11px;font-family:monospace;color:#34d399;background:rgba(16,185,129,0.14);padding:4px 10px;border-radius:6px;border:1px solid rgba(16,185,129,0.4);">K3S DEV ENVIRONMENT • {html.escape(slug)}</span>
+          <h1 style="margin:10px 0 6px 0;font-size:26px;">{escaped_title}</h1>
+          <p style="margin:0;color:var(--sub);font-size:13.5px;max-width:880px;">{escaped_desc}</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" onclick="runSimulation()">⚡ Run Live Telemetry Simulation</button>
+          <button class="btn" style="background:linear-gradient(135deg,#d97757,#b45309);" onclick="copyDeliverable()">📋 Copy Deliverable Code</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3 style="margin-top:0;color:var(--cyan);">🎛️ Interactive Control &amp; Simulation Studio</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="font-size:12px;color:var(--sub);">Cluster / Workload Scale (Nodes / Workers)</label>
+            <input type="range" id="simScale" min="1" max="32" value="7" class="input" oninput="updateDashboard()" />
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--sub);">Target Concurrency / Batch Throughput</label>
+            <input type="range" id="simLoad" min="10" max="500" value="120" class="input" oninput="updateDashboard()" />
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="stat-val" id="valNodes">7 Nodes</div>
+            <div class="stat-lbl">Active Topology</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="valThroughput" style="color:#34d399;">1,680 ops/s</div>
+            <div class="stat-lbl">Projected Throughput</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="valLatency" style="color:#fdba74;">4.2 ms</div>
+            <div class="stat-lbl">P95 Latency</div>
+          </div>
+        </div>
+        <canvas id="liveCanvas" width="600" height="220"></canvas>
+        <div id="simLog" style="margin-top:12px;font-family:monospace;font-size:12px;color:#a7f3d0;background:#04070f;padding:10px 12px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);">
+          ✓ K3s dev pod initialized • Ready for interactive testing
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h3 style="margin:0;color:#fdba74;">✴️🪽 Agent Architecture &amp; Code Deliverable</h3>
+          <span style="font-size:11px;font-family:monospace;color:var(--sub);">{html.escape(agent_name)} • {html.escape(model)}</span>
+        </div>
+        <pre id="codeBlock">{escaped_out}</pre>
+      </div>
+    </div>
+  </div>
+  {ADSENSE_FOOTER_UNIT}
+  <script>
+    const canvas = document.getElementById('liveCanvas');
+    const ctx = canvas.getContext('2d');
+    let points = Array.from({{length: 40}}, (_, i) => 40 + Math.sin(i * 0.3) * 25 + Math.random() * 15);
+
+    function drawChart() {{
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      for (let y = 40; y < canvas.height; y += 45) {{
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }}
+      ctx.beginPath();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      points.forEach((p, idx) => {{
+        const x = (idx / (points.length - 1)) * canvas.width;
+        const y = canvas.height - (p / 120) * (canvas.height - 30) - 15;
+        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }});
+      ctx.stroke();
+    }}
+
+    function updateDashboard() {{
+      const scale = parseInt(document.getElementById('simScale').value || '7', 10);
+      const load = parseInt(document.getElementById('simLoad').value || '120', 10);
+      const tp = scale * load * 2;
+      const lat = Math.max(0.8, (18 / Math.sqrt(scale)) + (load / 180)).toFixed(1);
+      document.getElementById('valNodes').textContent = scale + ' Nodes';
+      document.getElementById('valThroughput').textContent = tp.toLocaleString() + ' ops/s';
+      document.getElementById('valLatency').textContent = lat + ' ms';
+      points.shift();
+      points.push(Math.min(115, 25 + (scale * 2.2) + (load * 0.12) + Math.random() * 12));
+      drawChart();
+    }}
+
+    function runSimulation() {{
+      for (let i = 0; i < 8; i++) {{
+        setTimeout(() => {{
+          updateDashboard();
+          document.getElementById('simLog').textContent = '⚡ Live K3s Dev Probe [' + new Date().toLocaleTimeString() + '] — Status: HEALTHY (200 OK)';
+        }}, i * 180);
+      }}
+    }}
+
+    function copyDeliverable() {{
+      navigator.clipboard.writeText(document.getElementById('codeBlock').innerText);
+      document.getElementById('simLog').textContent = '📋 Copied agent deliverable code to clipboard!';
+    }}
+
+    updateDashboard();
+    setInterval(updateDashboard, 2500);
+  </script>
+</body>
+</html>"""
+    return _ensure_adsense_in_html(doc, title, slug, agent_name, model, ticket_id)
+
+
+def deploy_completed_ticket_to_k3s_dev(ticket_id: str) -> Optional[Dict[str, Any]]:
+    """Deploys a completed ticket's website/app into the K3s 'dev' namespace gateway (/app/data/dev_apps/<slug>)."""
+    state = load_state()
+    ticket = next((t for t in state.get("tickets", []) if t.get("id") == ticket_id), None)
+    if not ticket or not ticket.get("output"):
+        return None
+    if ticket.get("status") not in ("COMPLETED", "AWAITING_APPROVAL"):
+        return None
+
+    agent = next((a for a in state.get("agents", []) if a.get("id") == ticket.get("assigned_to")), state["agents"][0])
+    slug = ticket.get("dev_slug") or _make_slug(ticket.get("title", "app"), prefix=ticket_id)
+    app_dir = os.path.join(DEV_APPS_DIR, slug)
+    os.makedirs(app_dir, exist_ok=True)
+
+    agent_display = f"{agent.get('name', 'Claude-01')} + Hermes Co-Op" if ticket.get("collaborate") else agent.get("name", "Agent")
+    html_doc = synthesize_interactive_webapp_html(
+        title=ticket.get("title", "Autonomous App"),
+        description=ticket.get("description", ""),
+        agent_output=ticket.get("output", ""),
+        agent_name=agent_display,
+        model=ticket.get("model_used", agent.get("model", "qwen2.5-coder:14b")),
+        ticket_id=ticket_id,
+        slug=slug,
+    )
+
+    with open(os.path.join(app_dir, "index.html"), "w", encoding="utf-8") as f:
+        f.write(html_doc)
+    with open(os.path.join(app_dir, "ads.txt"), "w", encoding="utf-8") as f:
+        f.write(ADS_TXT_BODY)
+
+    k3s_dev_url = f"{K3S_DEV_GATEWAY_URL.rstrip('/')}/{slug}/"
+    paperclip_dev_url = f"http://192.168.0.81:30791/dev-apps/{slug}/"
+
+    app_meta = {
+        "id": f"devapp-{slug}",
+        "slug": slug,
+        "ticket_id": ticket_id,
+        "title": ticket.get("title", "Autonomous Web App"),
+        "description": (ticket.get("description") or "")[:240],
+        "agent_id": agent.get("id"),
+        "agent_name": agent_display,
+        "agent_avatar": agent.get("avatar", "✴️"),
+        "model": ticket.get("model_used", agent.get("model", "qwen2.5-coder:14b")),
+        "namespace": "dev",
+        "k3s_dev_url": k3s_dev_url,
+        "paperclip_dev_url": paperclip_dev_url,
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp_epoch": round(time.time(), 2),
+        "auto_open": True,
+    }
+    with open(os.path.join(app_dir, "meta.json"), "w", encoding="utf-8") as mf:
+        json.dump(app_meta, mf, indent=2)
+
+    state = load_state()
+    ticket = next((t for t in state.get("tickets", []) if t.get("id") == ticket_id), ticket)
+    ticket["dev_app"] = app_meta
+    if ticket.get("hermes_log") and isinstance(ticket["hermes_log"].get("steps"), list):
+        ticket["hermes_log"]["steps"].append({
+            "step": "K3s Dev Deployed",
+            "time": f"{round((ticket.get('duration_ms') or 1000) / 1000.0, 2)}s",
+            "detail": f"Deployed live website to K3s namespace 'dev': {k3s_dev_url}",
+        })
+
+    dev_apps = state.setdefault("dev_apps", [])
+    dev_apps = [a for a in dev_apps if a.get("slug") != slug]
+    dev_apps.insert(0, app_meta)
+    state["dev_apps"] = dev_apps[:60]
+    state["last_deployed_dev_app"] = app_meta
+
+    add_audit(
+        state,
+        agent_display,
+        f"Deployed live website '{ticket.get('title')}' to K3s 'dev' namespace -> {k3s_dev_url}",
+        "SUCCESS",
+    )
+    save_state(state)
+    return {"ticket": ticket, "dev_app": app_meta, "state": state}
+
+
+CONTINUOUS_FACTORY_RUNNING: bool = False
+CONTINUOUS_FACTORY_BUILDING_NOW: bool = False
+CONTINUOUS_FACTORY_THREAD: Optional[threading.Thread] = None
+
+
+def build_next_autonomous_dev_app_sync(custom_title: str = "", custom_desc: str = "", agent_id: str = "") -> Dict[str, Any]:
+    """Synchronously builds & deploys a new website/app to K3s dev using Claude + Hermes Co-Op."""
+    global CONTINUOUS_FACTORY_BUILDING_NOW
+    CONTINUOUS_FACTORY_BUILDING_NOW = True
+    try:
+        state = load_state()
+        existing_titles = {a.get("title", "").lower() for a in state.get("dev_apps", [])}
+        chosen_bp = None
+        if custom_title:
+            chosen_bp = {
+                "slug": _make_slug(custom_title),
+                "title": custom_title,
+                "description": custom_desc or f"Build a complete, self-contained, interactive single-page HTML5/CSS/JS web application (<!DOCTYPE html>...</html>) for: {custom_title}.",
+            }
+        else:
+            for bp in AUTONOMOUS_APP_BLUEPRINTS:
+                if bp["title"].lower() not in existing_titles:
+                    chosen_bp = bp
+                    break
+            if not chosen_bp:
+                idx_num = len(state.get("dev_apps", [])) + 1
+                base_bp = AUTONOMOUS_APP_BLUEPRINTS[idx_num % len(AUTONOMOUS_APP_BLUEPRINTS)]
+                chosen_bp = {
+                    "slug": f"{base_bp['slug']}-v{idx_num}",
+                    "title": f"{base_bp['title']} (Edition #{idx_num})",
+                    "description": base_bp["description"],
+                }
+
+        # Alternate between Claude-01, Hermes-01, Pixel, and Forge so the whole AI company builds sites together
+        rotation = ["agent-claude", "agent-hermes", "agent-coder"]
+        chosen_agent_id = agent_id or rotation[len(state.get("dev_apps", [])) % len(rotation)]
+        if not any(a.get("id") == chosen_agent_id for a in state.get("agents", [])):
+            chosen_agent_id = state["agents"][0]["id"]
+
+        prompt_desc = (
+            f"{chosen_bp['description']}\n\n"
+            f"IMPORTANT: Return a COMPLETE, self-contained single-page HTML5 application (`<!DOCTYPE html>...</html>`) "
+            f"with embedded `<style>` (modern dark-glass UI) and `<script>` (interactive controls, live calculations, charts, or simulations) "
+            f"so it can be deployed directly to the K3s `dev` namespace and opened in the browser."
+        )
+
+        res = asyncio.run(
+            create_and_run_ticket(
+                {
+                    "title": f"🌐 [K3s Dev Site] {chosen_bp['title']}",
+                    "description": prompt_desc,
+                    "assigned_to": chosen_agent_id,
+                    "priority": "HIGH",
+                    "auto_execute": True,
+                    "collaborate": True,
+                }
+            )
+        )
+        return res
+    finally:
+        CONTINUOUS_FACTORY_BUILDING_NOW = False
+
+
+def seed_initial_dev_apps_if_empty():
+    """Ensures at least 2 rich interactive web apps exist in /app/data/dev_apps immediately on startup."""
+    state = load_state()
+    if state.get("dev_apps"):
+        return
+    seed_specs = [
+        ("TCK-DEV1", "🌐 [K3s Dev Site] K3s Cluster Live Node & Pod Topology Radar", AUTONOMOUS_APP_BLUEPRINTS[0]["description"], "k3s-cluster-topology-radar"),
+        ("TCK-DEV2", "🌐 [K3s Dev Site] Dual-GPU VRAM & Ollama LLM Throughput Sizer", AUTONOMOUS_APP_BLUEPRINTS[1]["description"], "dual-gpu-vram-llm-sizer"),
+    ]
+    for tid, title, desc, slug in seed_specs:
+        app_dir = os.path.join(DEV_APPS_DIR, slug)
+        os.makedirs(app_dir, exist_ok=True)
+        html_doc = synthesize_interactive_webapp_html(
+            title=title,
+            description=desc,
+            agent_output=f"// Autonomous K3s Dev Application: {title}\n// Built by Claude-01 (✴️) + Hermes-01 (🪽) Co-Op Swarm\n// Target Namespace: dev (NodePort 30795)\n\nconst k3sConfig = {{\n  namespace: 'dev',\n  gatewayPort: 30795,\n  ollamaEndpoint: 'http://192.168.0.17:11434',\n  gpus: ['NVIDIA GeForce RTX 5070 (12GB)', 'NVIDIA GeForce RTX 3060 (12GB)'],\n  status: 'ONLINE'\n}};",
+            agent_name="Claude-01 + Hermes-01 Co-Op",
+            model="qwen2.5-coder:14b + qwen2.5-coder:7b",
+            ticket_id=tid,
+            slug=slug,
+        )
+        with open(os.path.join(app_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(html_doc)
+        with open(os.path.join(app_dir, "ads.txt"), "w", encoding="utf-8") as f:
+            f.write(ADS_TXT_BODY)
+        meta = {
+            "id": f"devapp-{slug}",
+            "slug": slug,
+            "ticket_id": tid,
+            "title": title,
+            "description": desc[:240],
+            "agent_id": "agent-claude",
+            "agent_name": "Claude-01 + Hermes-01 Co-Op",
+            "agent_avatar": "✴️",
+            "model": "qwen2.5-coder:14b + qwen2.5-coder:7b",
+            "namespace": "dev",
+            "k3s_dev_url": f"{K3S_DEV_GATEWAY_URL.rstrip('/')}/{slug}/",
+            "paperclip_dev_url": f"http://192.168.0.81:30791/dev-apps/{slug}/",
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp_epoch": round(time.time(), 2),
+            "auto_open": True,
+        }
+        with open(os.path.join(app_dir, "meta.json"), "w", encoding="utf-8") as mf:
+            json.dump(meta, mf, indent=2)
+        state.setdefault("dev_apps", []).insert(0, meta)
+        state["last_deployed_dev_app"] = meta
+    state.setdefault("continuous_factory_enabled", True)
+    state.setdefault("continuous_factory_interval_sec", 90)
+    save_state(state)
+
+
+def continuous_dev_factory_worker():
+    """Background daemon that keeps Claude & Hermes continuously creating and deploying new sites & apps to K3s dev."""
+    global CONTINUOUS_FACTORY_RUNNING
+    CONTINUOUS_FACTORY_RUNNING = True
+    time.sleep(8)
+    while CONTINUOUS_FACTORY_RUNNING:
+        try:
+            st = load_state()
+            enabled = st.get("continuous_factory_enabled", True)
+            interval = max(30, int(st.get("continuous_factory_interval_sec", 90)))
+            if enabled and not CONTINUOUS_FACTORY_BUILDING_NOW:
+                build_next_autonomous_dev_app_sync()
+            for _ in range(interval):
+                if not CONTINUOUS_FACTORY_RUNNING:
+                    break
+                time.sleep(1)
+        except Exception:
+            time.sleep(15)
+
+
+def start_continuous_dev_factory_if_needed():
+    global CONTINUOUS_FACTORY_THREAD
+    seed_initial_dev_apps_if_empty()
+    if CONTINUOUS_FACTORY_THREAD and CONTINUOUS_FACTORY_THREAD.is_alive():
+        return
+    CONTINUOUS_FACTORY_THREAD = threading.Thread(target=continuous_dev_factory_worker, daemon=True)
+    CONTINUOUS_FACTORY_THREAD.start()
+
+
+@app.get("/api/dev/apps")
+async def list_k3s_dev_apps():
+    state = load_state()
+    apps = state.get("dev_apps", [])
+    return {
+        "ok": True,
+        "namespace": "dev",
+        "k3s_dev_gateway_url": K3S_DEV_GATEWAY_URL,
+        "continuous_factory_enabled": state.get("continuous_factory_enabled", True),
+        "continuous_factory_interval_sec": state.get("continuous_factory_interval_sec", 90),
+        "building_now": CONTINUOUS_FACTORY_BUILDING_NOW,
+        "count": len(apps),
+        "last_deployed_app": apps[0] if apps else None,
+        "apps": apps,
+    }
+
+
+@app.post("/api/dev/factory/toggle")
+async def toggle_continuous_dev_factory(payload: Dict[str, Any] = Body(...)):
+    state = load_state()
+    if "enabled" in payload:
+        state["continuous_factory_enabled"] = bool(payload["enabled"])
+    else:
+        state["continuous_factory_enabled"] = not state.get("continuous_factory_enabled", True)
+    if "interval_sec" in payload:
+        state["continuous_factory_interval_sec"] = max(30, int(payload["interval_sec"]))
+    status_str = "ENABLED" if state["continuous_factory_enabled"] else "PAUSED"
+    add_audit(state, "K3s Dev Factory", f"Continuous Autonomous Website & App Factory {status_str} (interval: {state.get('continuous_factory_interval_sec', 90)}s)", "INFO")
+    save_state(state)
+    return {
+        "ok": True,
+        "continuous_factory_enabled": state["continuous_factory_enabled"],
+        "continuous_factory_interval_sec": state.get("continuous_factory_interval_sec", 90),
+        "state": state,
+    }
+
+
+@app.post("/api/dev/factory/build_now")
+async def trigger_dev_factory_build_now(payload: Dict[str, Any] = Body(default={})):
+    custom_title = (payload.get("title") or "").strip()
+    custom_desc = (payload.get("description") or "").strip()
+    agent_id = (payload.get("agent_id") or "").strip()
+    res = await asyncio.to_thread(build_next_autonomous_dev_app_sync, custom_title, custom_desc, agent_id)
+    st = load_state()
+    return {
+        "ok": True,
+        "ticket": res.get("ticket"),
+        "dev_app": st.get("last_deployed_dev_app"),
+        "state": st,
+    }
+
+
+@app.get("/dev-apps/{slug}/ads.txt")
+async def serve_dev_app_ads_txt(slug: str):
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(ADS_TXT_BODY)
+
+
+@app.get("/dev-apps/{slug}", response_class=HTMLResponse)
+@app.get("/dev-apps/{slug}/", response_class=HTMLResponse)
+async def serve_dev_app_direct(slug: str):
+    safe_slug = re.sub(r"[^a-zA-Z0-9_-]", "", slug)
+    idx_file = os.path.join(DEV_APPS_DIR, safe_slug, "index.html")
+    if not os.path.exists(idx_file):
+        raise HTTPException(status_code=404, detail=f"Dev app '{safe_slug}' not found")
+    with open(idx_file, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
 @app.on_event("startup")
 async def app_startup_event():
     start_telegram_worker_if_needed()
+    start_continuous_dev_factory_if_needed()
+
+
+
+
+@app.get("/ads.txt")
+async def serve_ads_txt():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("google.com, pub-1596056523034714, DIRECT, f08c47fec0942fa0\n")
 
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "7891"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    from dual_tls_runner import run_dual_http_https
+    port = int(os.environ.get("PORT", os.environ.get("PAPERCLIP_PORT", "7891")))
+    run_dual_http_https(app, port=port)

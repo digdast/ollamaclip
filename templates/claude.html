@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude-Ollama — Autonomous Reasoning & Hermes Co-Op Agent</title>
+  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/8915366?v=4">
+  <link rel="apple-touch-icon" href="https://avatars.githubusercontent.com/u/8915366?v=4">
+  <style>
+    :root {
+      --bg: #070910;
+      --panel: #101320;
+      --panel-alt: #161b2e;
+      --border: #262f4d;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #d97757;
+      --cyan: #38bdf8;
+      --green: #10b981;
+      --purple: #a855f7;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at 15% 0%, rgba(217, 119, 87, 0.14), transparent 40%),
+        radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.12), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: rgba(16, 19, 32, 0.92);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.15rem;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: #fff;
+      font-weight: 900;
+      padding: 5px 11px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .dot.off {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+
+    .connector-bar {
+      background: linear-gradient(90deg, rgba(217, 119, 87, 0.14), rgba(168, 85, 247, 0.14));
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .conn-inputs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input,
+    select,
+    textarea {
+      background: #080c16;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent), #c25938);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .btn-coop {
+      background: linear-gradient(135deg, #7e22ce, #0284c7);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 22px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-log {
+      height: 430px;
+      overflow-y: auto;
+      background: #060811;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .msg {
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .msg.user {
+      background: rgba(217, 119, 87, 0.15);
+      border: 1px solid rgba(217, 119, 87, 0.4);
+      align-self: flex-end;
+      max-width: 85%;
+    }
+
+    .msg.agent {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      width: 100%;
+    }
+
+    .skill-item,
+    .mem-item {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(217, 119, 87, 0.16);
+      color: var(--accent);
+      border: 1px solid rgba(217, 119, 87, 0.4);
+    }
+  </style>
+  <!-- Google AdSense with Page-Level Auto-Ads -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1596056523034714"
+     crossorigin="anonymous"></script>
+  <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: "ca-pub-1596056523034714",
+      enable_page_level_ads: true
+    });
+  </script>
+</head>
+
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-badge">✴️ CLAUDE-01</span>
+      <span>Claude-Ollama Autonomous Reasoning &amp; Hermes Co-Op Agent</span>
+    </div>
+    <div class="status-row">
+      <div class="pill">
+        <span class="dot" id="ollamaDot"></span>
+        <span id="ollamaLabel">Anthropic API / Ollama: Checking...</span>
+      </div>
+      <div class="pill">
+        <span class="dot" id="clipDot"></span>
+        <span id="clipLabel">Paperclip: Checking...</span>
+      </div>
+      <a id="hermesLink" href="http://192.168.0.17:7892" target="_blank" class="btn btn-secondary" style="text-decoration:none">🪽 Hermes Console ↗</a>
+      <a id="paperclipLink" href="#" target="_blank" class="btn btn-secondary" style="text-decoration:none">📎 Open Paperclip Control Plane ↗</a>
+    </div>
+  </header>
+
+  <div class="connector-bar">
+    <div style="font-size:0.85rem;font-weight:700;color:var(--accent)">
+      ✴️ 1-Click Tri-Bridge (Anthropic /v1/messages + Paperclip + Hermes Co-Op)
+    </div>
+    <div class="conn-inputs">
+      <label style="font-size:0.78rem;color:var(--muted)">Ollama / Anthropic URL:</label>
+      <input type="text" id="ollamaInput" value="http://192.168.0.17:11434" style="width:195px">
+      <label style="font-size:0.78rem;color:var(--muted)">Paperclip URL:</label>
+      <input type="text" id="clipInput" value="http://192.168.0.81:30791" style="width:210px">
+      <label style="font-size:0.78rem;color:var(--muted)">Hermes URL:</label>
+      <input type="text" id="hermesInput" value="http://192.168.0.17:7892" style="width:190px">
+      <select id="modelSelect"></select>
+      <button class="btn" onclick="saveConnections()">Connect &amp; Sync</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div>
+      <div class="card">
+        <div class="card-title">
+          <span>✴️ Claude Interactive Reasoning Console + Hermes Co-Op</span>
+          <span class="badge" id="activeModelBadge">Model: gemma4-claude:latest</span>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="chatPrompt"
+            placeholder="Ask Claude to architect systems, write code, or collaborate with Hermes..." style="flex:1"
+            onkeydown="if(event.key==='Enter')sendChat(false)">
+          <button class="btn" id="sendBtn" onclick="sendChat(false)">✴️ Execute (Claude)</button>
+          <button class="btn btn-coop" id="coopBtn" onclick="sendChat(true)">🤝 Co-Op with Hermes</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">
+          <span>Cross-Session Episodic Memory Bank</span>
+          <span class="badge" id="memCount">0 memories</span>
+        </div>
+        <div id="memoryList"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-title">
+          <span>✴️ Claude Architectural Playbooks &amp; Skills Vault</span>
+          <span class="badge" id="skillCount">0 playbooks</span>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+          Architectural playbooks and shared skills synthesized autonomously from Paperclip tickets and Hermes Co-Op sessions.
+        </p>
+        <div id="skillsList" style="max-height:480px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        const st = data.state;
+        const ollama = data.ollama;
+
+        const host = window.location.hostname || '192.168.0.81';
+        document.getElementById('paperclipLink').href = (host.endsWith('.ertechlab.com') && !window.location.port)
+          ? 'https://clip.ertechlab.com'
+          : `${window.location.protocol}//${host}:30791`;
+        if (st.hermes_url) {
+          document.getElementById('hermesLink').href = st.hermes_url;
+        }
+
+        const oDot = document.getElementById('ollamaDot');
+        const oLabel = document.getElementById('ollamaLabel');
+        if (ollama && ollama.connected) {
+          oDot.className = 'dot';
+          oLabel.textContent = `Anthropic /v1/messages (Ollama v${ollama.version} · ${ollama.models.length} models · ${ollama.latency_ms}ms)`;
+        } else {
+          oDot.className = 'dot off';
+          oLabel.textContent = `Backend Disconnected`;
+        }
+
+        const cDot = document.getElementById('clipDot');
+        const cLabel = document.getElementById('clipLabel');
+        if (st.paperclip_connected) {
+          cDot.className = 'dot';
+          cLabel.textContent = `Paperclip Linked (${st.node_id} · ${st.tasks_completed} tasks · ${st.co_op_sessions || 0} co-op)`;
+        } else {
+          cDot.className = 'dot off';
+          cLabel.textContent = `Paperclip Offline`;
+        }
+
+        document.getElementById('ollamaInput').value = st.ollama_url;
+        document.getElementById('clipInput').value = st.paperclip_url;
+        if (st.hermes_url) document.getElementById('hermesInput').value = st.hermes_url;
+        document.getElementById('activeModelBadge').textContent = `Model: ${st.active_model}`;
+
+        const sel = document.getElementById('modelSelect');
+        if (ollama && ollama.models.length > 0 && sel.options.length !== ollama.models.length) {
+          sel.innerHTML = ollama.models.map(m =>
+            `<option value="${m.name}" ${m.name === st.active_model ? 'selected' : ''}>${m.name} (${m.size_gb} GB)</option>`
+          ).join('');
+        }
+
+        const log = document.getElementById('chatLog');
+        if (st.chat_history && st.chat_history.length > 0) {
+          log.innerHTML = st.chat_history.map(m => {
+            if (m.role === 'user') {
+              return `<div class="msg user">${m.content}</div>`;
+            } else {
+              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[✴️ ${m.model}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Playbook: ' + m.learned_skill : ''}]</div>` : '';
+              return `<div class="msg agent">${meta}${m.content}</div>`;
+            }
+          }).join('');
+        }
+
+        document.getElementById('skillCount').textContent = `${st.skills.length} playbooks`;
+        document.getElementById('skillsList').innerHTML = st.skills.map(s => `
+          <div class="skill-item">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <strong style="color:var(--accent);font-size:0.9rem">${s.name}</strong>
+              <span class="badge">${s.category} · Used ${s.uses}x</span>
+            </div>
+            <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${s.description}</div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${s.created_at}</div>
+          </div>
+        `).join('');
+
+        document.getElementById('memCount').textContent = `${st.memories.length} memories`;
+        document.getElementById('memoryList').innerHTML = st.memories.map(m => `
+          <div class="mem-item">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <strong style="color:var(--cyan);font-size:0.82rem">${(m.tags || []).join(', ') || 'Memory'}</strong>
+              <span style="font-size:0.74rem;color:var(--muted)">${m.timestamp}</span>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text)">${m.summary}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveConnections() {
+      const ollama_url = document.getElementById('ollamaInput').value.trim();
+      const paperclip_url = document.getElementById('clipInput').value.trim();
+      const hermes_url = document.getElementById('hermesInput').value.trim();
+      const active_model = document.getElementById('modelSelect').value || 'gemma4-claude:latest';
+      await fetch('/api/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ollama_url, paperclip_url, hermes_url, active_model })
+      });
+      await loadState();
+    }
+
+    async function sendChat(coOpHermes) {
+      const input = document.getElementById('chatPrompt');
+      const prompt = input.value.trim();
+      if (!prompt) return;
+      input.value = '';
+      const log = document.getElementById('chatLog');
+      log.innerHTML += `<div class="msg user">${prompt}${coOpHermes ? ' [🤝 Co-Op with Hermes]' : ''}</div>`;
+      const btn = document.getElementById('sendBtn');
+      const cBtn = document.getElementById('coopBtn');
+      btn.disabled = true;
+      cBtn.disabled = true;
+      btn.textContent = coOpHermes ? 'Collaborating...' : 'Thinking...';
+      log.scrollTop = log.scrollHeight;
+
+      try {
+        const model = document.getElementById('modelSelect').value || 'gemma4-claude:latest';
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, model, co_op_hermes: coOpHermes })
+        });
+        await loadState();
+        log.scrollTop = log.scrollHeight;
+      } catch (e) {
+        log.innerHTML += `<div class="msg agent" style="color:var(--red)">Error: ${e}</div>`;
+      } finally {
+        btn.disabled = false;
+        cBtn.disabled = false;
+        btn.textContent = '✴️ Execute (Claude)';
+      }
+    }
+
+    loadState();
+    setInterval(loadState, 8000);
+  </script>
+
+  <div style="max-width:1200px;margin:18px auto;padding:0 16px;text-align:center;">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-1596056523034714"
+         data-ad-slot="auto"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>
+         (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
+  </div>
+
+</body>
+
+</html>

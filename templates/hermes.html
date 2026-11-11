@@ -219,6 +219,15 @@
       border: 1px solid rgba(245, 158, 11, 0.35);
     }
   </style>
+  <!-- Google AdSense with Page-Level Auto-Ads -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1596056523034714"
+     crossorigin="anonymous"></script>
+  <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: "ca-pub-1596056523034714",
+      enable_page_level_ads: true
+    });
+  </script>
 </head>
 
 <body>
@@ -321,7 +330,7 @@
         currentState = data;
 
         const host = window.location.hostname || '192.168.0.81';
-        document.getElementById('paperclipLink').href = `http://${host}:30791`;
+        document.getElementById('paperclipLink').href = (host.endsWith('.ertechlab.com') && !window.location.port) ? 'https://clip.ertechlab.com' : `${window.location.protocol}//${host}:30791`;
 
         const oDot = document.getElementById('ollamaDot');
         const oLabel = document.getElementById('ollamaLabel');
@@ -479,6 +488,19 @@
 
     loadHermesHub();
   </script>
+
+  <div style="max-width:1200px;margin:18px auto;padding:0 16px;text-align:center;">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-1596056523034714"
+         data-ad-slot="auto"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>
+         (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
+  </div>
+
 </body>
 
 </html>

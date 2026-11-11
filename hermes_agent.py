@@ -246,15 +246,31 @@ def run_ollama_inference(
         f"EPISODIC MEMORY:\n{memories_context}\n\n"
         f"Provide complete, comprehensive, production-ready solutions with zero truncation and zero placeholders. Conclude with a 1-line 'Learned Skill Takeaway'."
     )
-    url = st["ollama_url"].rstrip("/") + "/api/chat"
+    ollama_base = st["ollama_url"].rstrip("/")
+    effective_model = model
+    try:
+        with urllib.request.urlopen(f"{ollama_base}/api/ps", timeout=3) as r_ps:
+            ps_models = json.loads(r_ps.read().decode("utf-8")).get("models", [])
+        hot_names = [m.get("name") for m in ps_models if m.get("name")]
+        total_vram_gb = sum(m.get("size_vram", 0) for m in ps_models) / (1024 ** 3)
+        if hot_names and effective_model not in hot_names and total_vram_gb >= 15.0:
+            for preferred_hot in ["qwen2.5-coder:14b", "qwen2.5-coder:7b", "gemma4-claude:latest"]:
+                if preferred_hot in hot_names:
+                    effective_model = preferred_hot
+                    break
+            else:
+                effective_model = hot_names[0]
+    except Exception:
+        pass
+    url = ollama_base + "/api/chat"
     payload = {
-        "model": model,
+        "model": effective_model,
         "stream": False,
         "messages": [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "options": {"temperature": 0.3, "num_predict": 8192},
+        "options": {"temperature": 0.3, "num_predict": 1024},
     }
     t0 = time.time()
     req = urllib.request.Request(
@@ -630,7 +646,15 @@ async def hermes_pull_model(payload: Dict[str, Any] = Body(...)):
     return await asyncio.to_thread(_post)
 
 
+
+
+@app.get("/ads.txt")
+async def serve_ads_txt():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("google.com, pub-1596056523034714, DIRECT, f08c47fec0942fa0\n")
+
+
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "7892"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    from dual_tls_runner import run_dual_http_https
+    port = int(os.environ.get("PORT", os.environ.get("PAPERCLIP_PORT", "7892")))
+    run_dual_http_https(app, port=port)

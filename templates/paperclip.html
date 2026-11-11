@@ -441,6 +441,15 @@
       overflow-x: auto;
     }
   </style>
+  <!-- Google AdSense with Page-Level Auto-Ads -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1596056523034714"
+     crossorigin="anonymous"></script>
+  <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: "ca-pub-1596056523034714",
+      enable_page_level_ads: true
+    });
+  </script>
 </head>
 
 <body>
@@ -454,7 +463,7 @@
           <span class="badge">CLIP-OS v1.0</span>
         </h1>
         <div style="font-size:11.5px; color:var(--text-sub);" id="companySubtitle">
-          Zero-Human AI Company Control Plane • Native Ollama & Hermes Edition
+          Zero-Human AI Company Control Plane • Native Ollama, Hermes &amp; Claude Co-Op Edition
         </div>
       </div>
     </div>
@@ -462,8 +471,9 @@
     <nav class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('website', this)">🌐 Website & Download</button>
       <button class="tab-btn" onclick="switchTab('control', this)">🏢 AI Org Chart & Tickets</button>
+      <button class="tab-btn" id="devAppsTabBtn" onclick="switchTab('devapps', this)" style="border-color:rgba(16,185,129,0.5); color:#34d399;">🚀 K3s Dev Sites (30795)</button>
       <button class="tab-btn" onclick="switchTab('ollama', this)">🦙 Ollama Hub (192.168.0.17)</button>
-      <button class="tab-btn" onclick="switchTab('hermes', this)">🪽 Hermes Agent Bridge</button>
+      <button class="tab-btn" onclick="switchTab('hermes', this)">🪽✴️ Hermes &amp; Claude Bridge</button>
       <button class="tab-btn" id="telegramTabBtn" onclick="switchTab('telegram', this)">📱 Telegram
         (908-845-3667)</button>
       <button class="tab-btn" onclick="window.open('http://192.168.0.81:30678', '_blank')">⚡ n8n Workflows (30678)
@@ -476,10 +486,16 @@
         <span class="dot"></span>
         <span id="ollamaStatusText">Ollama: Connecting...</span>
       </div>
+      <div class="ollama-pill" id="devFactoryStatusPill"
+        style="background:rgba(16,185,129,0.14); border-color:rgba(16,185,129,0.45); color:#34d399; cursor:pointer;"
+        onclick="switchTab('devapps', document.getElementById('devAppsTabBtn'))">
+        <span class="dot" style="background:#10b981; box-shadow:0 0 8px #10b981;"></span>
+        <span id="devFactoryStatusText">K3s Dev Factory: ACTIVE</span>
+      </div>
       <div class="ollama-pill" id="agentStatusPill"
         style="background:rgba(168,85,247,0.14); border-color:rgba(168,85,247,0.4); color:#c084fc;">
         <span class="dot" style="background:#a855f7; box-shadow:0 0 8px #a855f7;"></span>
-        <span id="agentStatusText">Agent: Connecting...</span>
+        <span id="agentStatusText">Swarm: Hermes + Claude Ready</span>
       </div>
       <div class="ollama-pill" id="telegramStatusPill"
         style="background:rgba(14,165,233,0.14); border-color:rgba(14,165,233,0.4); color:#38bdf8; cursor:pointer;"
@@ -498,26 +514,29 @@
         style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:14px;">
         <div>
           <div style="font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;">
-            <span>⚡ 1-Click Dedicated Ollama Connector</span>
+            <span>⚡ 1-Click Dedicated Ollama, Hermes &amp; Claude Connector</span>
             <span class="badge" id="discoveredModelsBadge">14 Models Ready</span>
           </div>
           <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
-            Point Paperclip & Hermes at any local or LAN Ollama server — auto-discovers GGUF models, context windows &
-            capabilities.
+            Point Paperclip, Hermes &amp; Claude at any local or LAN Ollama server — supports native <code>/api/chat</code> and Anthropic <code>/v1/messages</code>.
           </div>
         </div>
         <div class="connect-inputs">
-          <input type="text" id="ollamaUrlInput" class="input-box" style="width:260px; font-family:monospace;"
+          <input type="text" id="ollamaUrlInput" class="input-box" style="width:230px; font-family:monospace;"
             value="http://192.168.0.17:11434" />
           <button class="btn btn-primary" onclick="connectOllama()">🔌 1-Click Connect Ollama</button>
           <button class="btn"
             style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
             onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
           <button class="btn"
+            style="border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#9333ea);"
+            onclick="openDispatchClaudeWorker()">✴️ + Dispatch Claude Agent</button>
+          <button class="btn"
             style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
             onclick="openDispatchAgentStudio()">🤖 + Dispatch Agent</button>
-          <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Open Hermes
-            Agent UI</a>
+          <a class="btn btn-emerald" id="openHermesBtn" href="http://192.168.0.81:30792" target="_blank">🪽 Hermes UI</a>
+          <a class="btn" id="openClaudeBtn" href="http://192.168.0.17:7893" target="_blank"
+            style="border-color:rgba(217,119,87,0.6); background:rgba(217,119,87,0.18); color:#fdba74;">✴️ Claude UI</a>
         </div>
       </div>
 
@@ -526,18 +545,22 @@
         style="display:flex; align-items:center; justify-content:space-between; width:100%; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:8px; flex-wrap:wrap; gap:12px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-size:13px; font-weight:700; color:#c084fc; display:flex; align-items:center; gap:6px;">
-            <span>🪽</span> Agent Connection:
+            <span>🪽✴️</span> Active Agent Node:
           </span>
           <select id="agentNodeDropdown" class="select-box"
             style="font-weight:600; min-width:340px; border-color:rgba(168,85,247,0.45); background:rgba(15,23,42,0.95);"
             onchange="onSelectHermesNode(this.value)">
-            <!-- dynamically populated from st.hermes_nodes -->
+            <!-- dynamically populated from st.hermes_nodes (includes Hermes & Claude nodes) -->
           </select>
           <span class="badge" id="activeAgentNodeBadge" style="color:#a7f3d0; border-color:#059669;">Connected</span>
+          <span class="badge" style="color:#fdba74; border-color:rgba(217,119,87,0.5); background:rgba(217,119,87,0.12);">🤝 Hermes + Claude Co-Op Active</span>
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <button class="btn btn-emerald" style="padding:7px 14px; font-size:12px;" onclick="openConnectAgentModal()">
-            ➕ Connect Any Agent...
+          <button class="btn btn-emerald" style="padding:7px 14px; font-size:12px;" onclick="openConnectAgentModal('hermes')">
+            ➕ Connect Hermes Node...
+          </button>
+          <button class="btn" style="padding:7px 14px; font-size:12px; border-color:rgba(217,119,87,0.55); background:rgba(217,119,87,0.18); color:#fdba74;" onclick="openConnectAgentModal('claude')">
+            ➕ Connect Claude Node...
           </button>
           <a class="btn" id="activeAgentConsoleBtn" href="http://192.168.0.17:7892" target="_blank"
             style="padding:7px 14px; font-size:12px; border-color:rgba(168,85,247,0.5); background:rgba(168,85,247,0.15); color:#c084fc;">
@@ -571,6 +594,11 @@
             🪽 Dispatch Hermes Worker
           </button>
           <button class="btn"
+            style="padding:12px 22px; font-size:14px; border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#b45309);"
+            onclick="openDispatchClaudeWorker()">
+            ✴️ Dispatch Claude Agent
+          </button>
+          <button class="btn"
             style="padding:12px 22px; font-size:14px; border-color:rgba(168,85,247,0.55); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
             onclick="openDispatchAgentStudio()">
             🤖 Dispatch New AI Agent
@@ -581,7 +609,11 @@
           </a>
           <a class="btn" style="padding:12px 22px; font-size:14px;" id="heroHermesLink" href="http://192.168.0.81:30792"
             target="_blank">
-            🪽 Launch Hermes Agent Console
+            🪽 Launch Hermes Console
+          </a>
+          <a class="btn" style="padding:12px 22px; font-size:14px; border-color:rgba(217,119,87,0.55); color:#fdba74;" id="heroClaudeLink" href="http://192.168.0.17:7893"
+            target="_blank">
+            ✴️ Launch Claude Console
           </a>
           <a class="btn"
             style="padding:12px 22px; font-size:14px; border-color:rgba(245,158,11,0.5); background:linear-gradient(135deg,#d97706,#b45309);"
@@ -644,6 +676,9 @@
             style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
             onclick="openDispatchHermesWorker()">🪽 + Dispatch Hermes Worker</button>
           <button class="btn"
+            style="border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#b45309);"
+            onclick="openDispatchClaudeWorker()">✴️ + Dispatch Claude Agent</button>
+          <button class="btn"
             style="border-color:rgba(168,85,247,0.5); background:linear-gradient(135deg,#7e22ce,#4f46e5);"
             onclick="toggleAgentStudio()">🤖 + Dispatch Agent</button>
           <button class="btn"
@@ -660,12 +695,12 @@
           <div>
             <h3 style="font-size:16px; display:flex; align-items:center; gap:8px;">
               <span>🤖 Dispatch & Spawn New Autonomous AI Agent</span>
-              <span class="badge" style="color:#c084fc; border-color:rgba(168,85,247,0.45);">Ollama + Hermes
+              <span class="badge" style="color:#c084fc; border-color:rgba(168,85,247,0.45);">Ollama + Hermes + Claude
                 Ready</span>
             </h3>
             <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">
               Choose a 1-click specialist blueprint or customize a new AI employee connected to local Ollama
-              (<code>192.168.0.17:11434</code>) or Hermes Bridge (<code>30792</code>).
+              (<code>192.168.0.17:11434</code>), Hermes Bridge (<code>7892</code>), or Claude Anthropic Bridge (<code>7893</code>).
             </div>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -673,8 +708,10 @@
               DevOps SRE</button>
             <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('research')">🔬
               Deep Researcher</button>
-            <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('hermes')">🪽
+            <button class="btn" style="font-size:11.5px; padding:6px 10px; border-color:rgba(56,189,248,0.5);" onclick="applyAgentPreset('hermes')">🪽
               Hermes Field Worker</button>
+            <button class="btn" style="font-size:11.5px; padding:6px 10px; border-color:rgba(217,119,87,0.6); color:#fdba74;" onclick="applyAgentPreset('claude')">✴️
+              Claude Code Architect</button>
             <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('db')">🗄️ Storage
               & DB Architect</button>
             <button class="btn" style="font-size:11.5px; padding:6px 10px;" onclick="applyAgentPreset('ui')">🎨 Frontend
@@ -714,6 +751,7 @@
               <option value="🛠️" selected>🛠️ DevOps / Wrench</option>
               <option value="🤖">🤖 Autonomous Bot</option>
               <option value="🪽">🪽 Hermes Wings</option>
+              <option value="✴️">✴️ Claude Starburst</option>
               <option value="🔬">🔬 Researcher</option>
               <option value="⚡">⚡ High-Speed Executor</option>
               <option value="🗄️">🗄️ Database / Storage</option>
@@ -728,6 +766,7 @@
             <select id="newAgentAdapter" class="select-box">
               <option value="ollama_native" selected>ollama_native (Direct Ollama 192.168.0.17)</option>
               <option value="hermes_bridge">hermes_bridge (Hermes Self-Improving Worker)</option>
+              <option value="claude_bridge">claude_bridge (Claude Anthropic API + Hermes Co-Op)</option>
             </select>
           </div>
           <div class="field" style="margin-bottom:0;">
@@ -794,10 +833,25 @@
             <textarea id="tckDesc" rows="5"
               placeholder="Describe the technical deliverable, constraints, or architecture requirements..."></textarea>
           </div>
-          <button class="btn btn-primary" id="submitTicketBtn" style="width:100%; justify-content:center; padding:11px;"
-            onclick="createTicket()">
-            🚀 Dispatch & Execute via Ollama (192.168.0.17)
-          </button>
+          <div style="margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(217,119,87,0.1); border:1px solid rgba(217,119,87,0.35);">
+            <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#fdba74; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="tckCollaborate" checked />
+              <span>🤝 Work Together: Have Hermes &amp; Claude Collaborate (2-Phase Co-Op)</span>
+            </label>
+            <div style="font-size:11px; color:var(--text-sub); margin-top:4px; padding-left:22px;">
+              When assigned to Hermes or Claude, both agents collaborate automatically (Claude Architecture via Anthropic <code>/v1/messages</code> + Hermes Operational Verification &amp; Skill Synthesis).
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="submitTicketBtn" style="flex:1; justify-content:center; padding:11px;"
+              onclick="createTicket()">
+              🚀 Dispatch & Execute via Ollama (192.168.0.17)
+            </button>
+            <button class="btn" id="submitCoOpBtn" style="flex:1; justify-content:center; padding:11px; border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#0284c7); color:#fff;"
+              onclick="createJointCoOpTicket()">
+              🤝 Dispatch Joint Claude + Hermes Mission
+            </button>
+          </div>
         </div>
 
         <div class="panel">
@@ -808,6 +862,72 @@
           <div id="ticketsContainer"></div>
         </div>
       </div>
+    </section>
+
+    <!-- VIEW 2.5: K3S DEV NAMESPACE WEBSITE & APP FACTORY -->
+    <section class="view-section" id="view-devapps">
+      <div class="panel" style="margin-bottom:20px; background:linear-gradient(135deg, rgba(16,185,129,0.14), rgba(14,165,233,0.14), rgba(217,119,87,0.14)); border-color:rgba(16,185,129,0.45);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span class="badge" style="color:#34d399; border-color:#10b981; font-size:12px;">K3S NAMESPACE: DEV • NODEPORT 30795</span>
+              <h2 style="font-size:20px; margin:0;">🚀 Autonomous K3s Dev Website &amp; App Factory</h2>
+            </div>
+            <div style="font-size:13px; color:var(--text-sub); margin-top:6px;">
+              <strong>Claude-01 (✴️)</strong>, <strong>Hermes-01 (🪽)</strong>, and your AI Engineering Swarm continuously create, deploy, and open live interactive websites &amp; apps in the K3s <code>dev</code> namespace (<a href="http://192.168.0.81:30795/" target="_blank" style="color:#38bdf8;">http://192.168.0.81:30795/ ↗</a>).
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:#a7f3d0; font-weight:700; cursor:pointer; background:rgba(6,9,19,0.75); padding:8px 12px; border-radius:8px; border:1px solid rgba(16,185,129,0.4);">
+              <input type="checkbox" id="autoOpenSitesToggle" checked />
+              <span>🌐 Auto-Open Websites When Finished</span>
+            </label>
+            <button class="btn btn-primary" id="buildNextSiteNowBtn" onclick="triggerDevFactoryBuildNow(false)">
+              ⚡ Build &amp; Deploy Next Site Now
+            </button>
+            <button class="btn" id="toggleFactoryBtn" onclick="toggleContinuousFactory()">
+              ⏸️ Pause Continuous Factory
+            </button>
+            <a class="btn btn-emerald" href="http://192.168.0.81:30795/" target="_blank">
+              🌐 Open K3s Dev Portal (30795) ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- CUSTOM SITE BUILDER BAR -->
+        <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:end;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Custom Website / App Title</label>
+            <input type="text" id="customDevSiteTitle" class="input-box" placeholder="e.g., Proxmox GPU Cluster Dashboard or Interactive Game" />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Website Features &amp; Interactive Specifications</label>
+            <input type="text" id="customDevSiteDesc" class="input-box" placeholder="Describe the interactive charts, calculators, or tools Claude & Hermes should build and deploy to K3s dev..." />
+          </div>
+          <button class="btn" style="padding:10px 18px; border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#0284c7); color:#fff;" onclick="triggerDevFactoryBuildNow(true)">
+            ✴️🪽 Build &amp; Deploy Custom Site to K3s Dev
+          </button>
+        </div>
+      </div>
+
+      <!-- INLINE LIVE WEBSITE PREVIEW DRAWER -->
+      <div class="panel" id="devAppLivePreviewPanel" style="display:none; margin-bottom:22px; border-color:var(--cyan);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="badge" style="color:#34d399; border-color:#10b981;">🟢 LIVE K3S DEV PREVIEW</span>
+            <strong id="previewSiteTitle" style="font-size:15px; color:var(--text-main);">Website Preview</strong>
+            <a id="previewSiteExternalLink" href="http://192.168.0.81:30795/" target="_blank" style="font-size:12px; font-family:monospace; color:var(--cyan);">Open in Full Tab ↗</a>
+          </div>
+          <button class="btn" style="padding:5px 12px; font-size:12px;" onclick="document.getElementById('devAppLivePreviewPanel').style.display='none'">✕ Close Preview</button>
+        </div>
+        <iframe id="devAppPreviewIframe" src="about:blank" style="width:100%; height:560px; border:1px solid var(--border); border-radius:10px; background:#050811;"></iframe>
+      </div>
+
+      <div class="sec-hdr">
+        <h2>🌐 Live Websites &amp; Applications Deployed in K3s (<code>namespace: dev</code>)</h2>
+        <button class="btn" onclick="pollDevAppsAndAutoOpen(true)">🔄 Refresh Deployed Sites</button>
+      </div>
+      <div class="org-grid" id="devAppsGrid"></div>
     </section>
 
     <!-- VIEW 3: OLLAMA MODEL HUB (INSTALLED + OLLAMA.COM/LIBRARY?SORT=POPULAR DOWNLOADER) -->
@@ -853,21 +973,25 @@
       <div class="models-grid" id="modelsGrid"></div>
     </section>
 
-    <!-- VIEW 4: HERMES BRIDGE -->
+    <!-- VIEW 4: HERMES & CLAUDE BRIDGE -->
     <section class="view-section" id="view-hermes">
       <div class="sec-hdr">
         <div>
-          <h2>🪽 Hermes Autonomous Self-Improving Worker Nodes</h2>
+          <h2>🪽✴️ Hermes &amp; Claude Autonomous Worker Nodes</h2>
           <div style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">
-            Connect to any Hermes or custom agent node across your infrastructure (Debian GPU host
-            <code>192.168.0.17:7892</code>, K3s cluster <code>30792</code>, or custom endpoint).
+            Connect to any Hermes or Claude agent node across your infrastructure (Debian GPU host
+            <code>192.168.0.17:7892</code> &amp; <code>192.168.0.17:7893</code>, K3s cluster <code>30792</code> / <code>30793</code>, or custom endpoint).
           </div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn btn-emerald" onclick="openConnectAgentModal()">➕ Connect Any Agent Node...</button>
+          <button class="btn btn-emerald" onclick="openConnectAgentModal('hermes')">➕ Connect Hermes Node...</button>
+          <button class="btn" style="border-color:rgba(217,119,87,0.6); background:rgba(217,119,87,0.18); color:#fdba74;" onclick="openConnectAgentModal('claude')">➕ Connect Claude Node...</button>
           <button class="btn"
             style="border-color:rgba(56,189,248,0.5); background:linear-gradient(135deg,#0284c7,#0d9488);"
             onclick="openDispatchHermesWorker()">🪽 + Dispatch New Hermes Worker</button>
+          <button class="btn"
+            style="border-color:rgba(217,119,87,0.6); background:linear-gradient(135deg,#d97757,#b45309);"
+            onclick="openDispatchClaudeWorker()">✴️ + Dispatch New Claude Agent</button>
         </div>
       </div>
 
@@ -1044,11 +1168,20 @@
   <script>
     let appData = null;
 
-    // Dynamically point Hermes UI button to same host on port 30792 (or 7892 locally)
+    // Dynamically point Hermes & Claude UI buttons to same host on port 30792/30793 (or 7892/7893 locally)
     const hermesPort = location.port === '7891' ? '7892' : '30792';
-    const hermesUrl = `${location.protocol}//${location.hostname}:${hermesPort}`;
+    const hermesUrl = (location.hostname.endsWith('.ertechlab.com') && !location.port)
+      ? 'https://hermes.ertechlab.com'
+      : `${location.protocol}//${location.hostname}:${hermesPort}`;
     document.getElementById('openHermesBtn').href = hermesUrl;
     document.getElementById('heroHermesLink').href = hermesUrl;
+
+    const claudePort = location.port === '7891' ? '7893' : '30793';
+    const claudeUrl = (location.hostname.endsWith('.ertechlab.com') && !location.port)
+      ? 'https://claude.ertechlab.com'
+      : `${location.protocol}//${location.hostname}:${claudePort}`;
+    if (document.getElementById('openClaudeBtn')) document.getElementById('openClaudeBtn').href = claudeUrl;
+    if (document.getElementById('heroClaudeLink')) document.getElementById('heroClaudeLink').href = claudeUrl;
 
     function switchTab(viewName, btn) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -1181,10 +1314,14 @@
           : `<span class="badge" style="color:#34d399; border-color:#10b981;">✓ Governance Approved</span>`;
 
         let hermesLogBlock = '';
-        if (t.hermes_log || (ag.adapter === 'hermes_bridge' && t.output)) {
+        if (t.hermes_log || ((ag.adapter === 'hermes_bridge' || ag.adapter === 'claude_bridge') && t.output)) {
           const hl = t.hermes_log || {};
           const skillName = hl.learned_skill || 'autonomous-ops';
           const tokSec = hl.tok_per_sec ? `${hl.tok_per_sec} tok/s` : '';
+          const isCoOp = hl.collaborated || (t.model_used || '').includes('+');
+          const telemetryTitle = isCoOp
+            ? '🤝 Claude + Hermes Co-Op Telemetry'
+            : (ag.adapter === 'claude_bridge' ? '✴️ Claude Completion Telemetry' : '🪽 Hermes Completion Telemetry');
           const stepsHtml = (hl.steps || []).map(s => `
             <div style="display:flex; justify-content:space-between; gap:10px; padding:3px 0; border-bottom:1px dashed rgba(255,255,255,0.06); font-size:11px; font-family:monospace;">
               <span><strong style="color:var(--cyan);">${escapeHtml(s.step)}</strong>: ${escapeHtml(s.detail)}</span>
@@ -1196,7 +1333,7 @@
             <div style="margin-top:10px; background:rgba(6,9,19,0.7); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:10px 12px;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
                 <span style="font-size:12px; font-weight:700; color:var(--cyan); display:flex; align-items:center; gap:6px;">
-                  <span>🪽 Hermes Completion Telemetry</span>
+                  <span>${telemetryTitle}</span>
                   <span class="badge" style="color:#a7f3d0; border-color:#059669;">Skill: ${escapeHtml(skillName)}</span>
                 </span>
                 <span style="font-size:11px; font-family:monospace; color:var(--text-sub);">
@@ -1213,6 +1350,28 @@
             </div>
           `;
         }
+
+        const devAppBlock = t.dev_app ? `
+          <div style="margin-top:10px; background:linear-gradient(90deg, rgba(16,185,129,0.14), rgba(14,165,233,0.14)); border:1px solid rgba(16,185,129,0.45); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:12px; font-weight:800; color:#34d399; display:flex; align-items:center; gap:6px;">
+                <span>🚀 Deployed to K3s Namespace: <code>dev</code></span>
+                <span class="badge" style="color:#38bdf8;">/${escapeHtml(t.dev_app.slug)}/</span>
+              </div>
+              <div style="font-size:11px; color:var(--text-sub); margin-top:2px; font-family:monospace;">
+                K3s Dev URL: <a href="${t.dev_app.k3s_dev_url}" target="_blank" style="color:#38bdf8;">${escapeHtml(t.dev_app.k3s_dev_url)} ↗</a>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn" style="padding:6px 12px; font-size:12px; border-color:rgba(56,189,248,0.5);" onclick="previewDevAppInline('${escapeHtml(t.dev_app.k3s_dev_url)}', '${escapeHtml(t.dev_app.title)}')">
+                👁️ Preview Site Here
+              </button>
+              <a class="btn btn-emerald" style="padding:6px 12px; font-size:12px;" href="${t.dev_app.k3s_dev_url}" target="_blank">
+                🚀 Open Live Website ↗
+              </a>
+            </div>
+          </div>
+        ` : '';
 
         return `
           <div class="ticket-card">
@@ -1231,6 +1390,7 @@
               ${t.tokens} tokens (${t.duration_ms} ms) • ${t.updated_at}
             </div>
             <div style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(t.description)}</div>
+            ${devAppBlock}
             ${hermesLogBlock}
             <div class="ticket-output">${escapeHtml(t.output || '')}</div>
           </div>
@@ -1256,9 +1416,11 @@
         </div>
       `).join('');
 
-      // Render Hermes Nodes
+      // Render Hermes & Claude Nodes
       document.getElementById('hermesNodesGrid').innerHTML = (st.hermes_nodes || []).map(n => {
-        const isActive = n.node_id === activeNodeId;
+        const isActive = n.node_id === activeNodeId || n.node_id === st.active_claude_node_id;
+        const isClaude = n.agent_type === 'claude' || (n.node_id || '').toLowerCase().includes('claude') || (n.name || '').toLowerCase().includes('claude');
+        const nodeIcon = isClaude ? '✴️' : '🪽';
         const cardStyle = isActive ? 'border-color:rgba(168,85,247,0.7); box-shadow:0 0 20px rgba(168,85,247,0.25);' : '';
         const activeBadge = isActive
           ? `<span class="badge" style="color:#a7f3d0; border-color:#059669; background:rgba(16,185,129,0.15);">🟢 ACTIVE</span>`
@@ -1274,7 +1436,7 @@
           <div class="agent-card" style="${cardStyle}">
             <div class="agent-top">
               <div class="agent-identity">
-                <div class="avatar">🪽</div>
+                <div class="avatar">${nodeIcon}</div>
                 <div>
                   <div class="agent-name">${escapeHtml(n.name)}</div>
                   <div class="agent-role">Node ID: <code>${escapeHtml(n.node_id)}</code></div>
@@ -1292,7 +1454,7 @@
             <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
               ${actionBtn}
               <a class="btn btn-emerald" href="${n.endpoint}" target="_blank" style="flex:1; justify-content:center; padding:7px 10px; font-size:12px;">
-                🪽 Console ↗
+                ${nodeIcon} Console ↗
               </a>
               ${delBtn}
             </div>
@@ -1394,13 +1556,22 @@
       }
     }
 
-    function openConnectAgentModal() {
+    function openConnectAgentModal(agentType) {
       switchTab('hermes', document.querySelectorAll('.tab-btn')[3]);
       const panel = document.getElementById('connectCustomAgentPanel');
       if (panel) {
         panel.style.display = 'block';
+        const epInp = document.getElementById('customAgentEndpoint');
+        const nameInp = document.getElementById('customAgentName');
+        if (agentType === 'claude') {
+          if (epInp) epInp.value = 'http://192.168.0.17:7893';
+          if (nameInp) nameInp.value = 'Claude-Host-17 (GPU)';
+        } else if (agentType === 'hermes') {
+          if (epInp) epInp.value = 'http://192.168.0.17:7892';
+          if (nameInp) nameInp.value = 'Hermes-Host-17 (GPU)';
+        }
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.getElementById('customAgentEndpoint')?.focus();
+        epInp?.focus();
       }
     }
 
@@ -1608,6 +1779,15 @@
         model: 'qwen2.5-coder:7b',
         prompt: 'You are Hermes-02, an autonomous self-improving field agent linked via the Hermes Bridge. Execute tasks, extract reusable skills into the Skills Vault, and log episodic memories.'
       },
+      claude: {
+        name: 'Claude-02',
+        role: 'Autonomous Reasoning & Code Architect',
+        dept: 'Autonomous Ops',
+        avatar: '✴️',
+        adapter: 'claude_bridge',
+        model: 'gemma4-claude:latest',
+        prompt: 'You are Claude-02, an autonomous reasoning and code architect powered by the Anthropic Messages API on Ollama (gemma4-claude:latest). Collaborate with Hermes agents to design, implement, and verify production systems.'
+      },
       db: {
         name: 'Cipher',
         role: 'Principal Storage & Database Architect',
@@ -1663,6 +1843,26 @@
           modelSel.value = 'qwen2.5-coder:14b';
         } else if (Array.from(modelSel.options).some(o => o.value === 'qwen2.5-coder:7b')) {
           modelSel.value = 'qwen2.5-coder:7b';
+        }
+      }
+    }
+
+    function openDispatchClaudeWorker() {
+      openDispatchAgentStudio();
+      const claudeCount = (appData?.state?.agents || []).filter(a => (a.adapter || '').includes('claude') || (a.name || '').toLowerCase().includes('claude')).length;
+      const nextNum = String(claudeCount + 1).padStart(2, '0');
+      document.getElementById('newAgentName').value = `Claude-${nextNum}`;
+      document.getElementById('newAgentRole').value = 'Autonomous Reasoning & Code Architect';
+      document.getElementById('newAgentDept').value = 'Autonomous Ops';
+      document.getElementById('newAgentAvatar').value = '✴️';
+      document.getElementById('newAgentAdapter').value = 'claude_bridge';
+      document.getElementById('newAgentPrompt').value = `You are Claude-${nextNum}, an autonomous reasoning and code architect connected via the Anthropic Messages API on Ollama (gemma4-claude:latest) and paired with Hermes for joint Co-Op execution.`;
+      const modelSel = document.getElementById('newAgentModel');
+      if (modelSel) {
+        if (Array.from(modelSel.options).some(o => o.value === 'gemma4-claude:latest')) {
+          modelSel.value = 'gemma4-claude:latest';
+        } else if (Array.from(modelSel.options).some(o => o.value === 'qwen3.5:latest')) {
+          modelSel.value = 'qwen3.5:latest';
         }
       }
     }
@@ -1798,16 +1998,19 @@
       const desc = document.getElementById('tckDesc').value.trim();
       const assigned_to = document.getElementById('tckAgent').value;
       const priority = document.getElementById('tckPriority').value;
+      const collaborate = document.getElementById('tckCollaborate') ? document.getElementById('tckCollaborate').checked : true;
       if (!title) { alert('Please enter a ticket title'); return; }
 
       const btn = document.getElementById('submitTicketBtn');
       btn.disabled = true;
-      btn.textContent = '⏳ Agent Reasoning via Ollama (192.168.0.17)...';
+      btn.textContent = collaborate
+        ? '⏳ Agent + Co-Op Reasoning via Ollama (192.168.0.17)...'
+        : '⏳ Agent Reasoning via Ollama (192.168.0.17)...';
       try {
         await fetch('/api/tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, description: desc, assigned_to, priority, auto_execute: true })
+          body: JSON.stringify({ title, description: desc, assigned_to, priority, auto_execute: true, collaborate })
         });
         document.getElementById('tckTitle').value = '';
         document.getElementById('tckDesc').value = '';
@@ -1815,6 +2018,40 @@
       } finally {
         btn.disabled = false;
         btn.textContent = '🚀 Dispatch & Execute via Ollama (192.168.0.17)';
+      }
+    }
+
+    async function createJointCoOpTicket() {
+      const title = document.getElementById('tckTitle').value.trim();
+      const desc = document.getElementById('tckDesc').value.trim();
+      const priority = document.getElementById('tckPriority').value;
+      if (!title) { alert('Please enter a ticket title for the Joint Claude + Hermes Mission'); return; }
+
+      const btn = document.getElementById('submitCoOpBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '🤝 Claude & Hermes Collaborating (2-Phase Pipeline)...';
+      }
+      try {
+        await fetch('/api/swarm/collaborate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description: desc,
+            lead_agent_id: 'agent-claude',
+            partner_agent_id: 'agent-hermes',
+            priority
+          })
+        });
+        document.getElementById('tckTitle').value = '';
+        document.getElementById('tckDesc').value = '';
+        await loadState();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🤝 Dispatch Joint Claude + Hermes Mission';
+        }
       }
     }
 
@@ -1977,9 +2214,167 @@
       await loadOllamaLibrary();
     }
 
+    // --- K3S DEV NAMESPACE FACTORY & AUTO-BROWSER OPENER ---
+    let knownDevAppSlugs = new Set();
+    let initialDevAppsLoaded = false;
+    let factoryEnabledState = true;
+
+    function previewDevAppInline(url, title) {
+      switchTab('devapps', document.getElementById('devAppsTabBtn'));
+      const panel = document.getElementById('devAppLivePreviewPanel');
+      const iframe = document.getElementById('devAppPreviewIframe');
+      const titleEl = document.getElementById('previewSiteTitle');
+      const extLink = document.getElementById('previewSiteExternalLink');
+      if (panel && iframe) {
+        panel.style.display = 'block';
+        iframe.src = url;
+        if (titleEl) titleEl.textContent = title || url;
+        if (extLink) extLink.href = url;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    async function pollDevAppsAndAutoOpen(manualRefresh = false) {
+      try {
+        const res = await fetch('/api/dev/apps');
+        const data = await res.json();
+        if (!data.ok) return;
+        const apps = data.apps || [];
+        factoryEnabledState = data.continuous_factory_enabled !== false;
+
+        const pillTxt = document.getElementById('devFactoryStatusText');
+        if (pillTxt) {
+          pillTxt.textContent = data.building_now
+            ? `⚡ Building New Site... (${apps.length} Live in K3s dev)`
+            : (factoryEnabledState ? `K3s Dev Factory: ACTIVE (${apps.length} Sites)` : `K3s Dev Factory: PAUSED (${apps.length} Sites)`);
+        }
+        const toggleBtn = document.getElementById('toggleFactoryBtn');
+        if (toggleBtn) {
+          toggleBtn.textContent = factoryEnabledState ? '⏸️ Pause Continuous Factory' : '▶️ Resume Continuous Factory';
+        }
+
+        const autoOpenChecked = document.getElementById('autoOpenSitesToggle')?.checked ?? true;
+        if (!initialDevAppsLoaded) {
+          apps.forEach(a => knownDevAppSlugs.add(a.slug));
+          initialDevAppsLoaded = true;
+        } else {
+          for (const a of apps) {
+            if (!knownDevAppSlugs.has(a.slug)) {
+              knownDevAppSlugs.add(a.slug);
+              // Automatically show the user the newly finished website!
+              previewDevAppInline(a.k3s_dev_url, a.title);
+              if (autoOpenChecked) {
+                try { window.open(a.k3s_dev_url, '_blank'); } catch (e) {}
+              }
+              await loadState();
+              break;
+            }
+          }
+        }
+
+        const grid = document.getElementById('devAppsGrid');
+        if (grid) {
+          grid.innerHTML = apps.map(a => `
+            <div class="agent-card" style="border-color:rgba(16,185,129,0.4);">
+              <div class="agent-top">
+                <div class="agent-identity">
+                  <div class="avatar">${a.agent_avatar || '🚀'}</div>
+                  <div>
+                    <div class="agent-name">${escapeHtml(a.title)}</div>
+                    <div class="agent-role">Slug: <code>/${escapeHtml(a.slug)}/</code> • Ticket: <code>${escapeHtml(a.ticket_id || 'AUTO')}</code></div>
+                  </div>
+                </div>
+                <span class="badge" style="color:#34d399; border-color:#10b981;">k3s: dev</span>
+              </div>
+              <div class="agent-meta">
+                <div>Built by: <strong>${escapeHtml(a.agent_name)}</strong></div>
+                <div>Model: <code>${escapeHtml(a.model)}</code></div>
+                <div>K3s Dev URL: <a href="${a.k3s_dev_url}" target="_blank" style="color:var(--cyan); font-family:monospace;">${escapeHtml(a.k3s_dev_url)} ↗</a></div>
+                <div>Paperclip Mirror: <a href="${a.paperclip_dev_url}" target="_blank" style="color:#c084fc; font-family:monospace;">${escapeHtml(a.paperclip_dev_url)} ↗</a></div>
+                <div>Deployed At: ${escapeHtml(a.created_at || '')}</div>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn" style="flex:1; justify-content:center; padding:8px;" onclick="previewDevAppInline('${escapeHtml(a.k3s_dev_url)}', '${escapeHtml(a.title)}')">
+                  👁️ Preview Inline
+                </button>
+                <a class="btn btn-emerald" style="flex:1; justify-content:center; padding:8px;" href="${a.k3s_dev_url}" target="_blank">
+                  🚀 Open Website ↗
+                </a>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        console.error('Failed polling dev apps:', e);
+      }
+    }
+
+    async function triggerDevFactoryBuildNow(useCustom) {
+      const btn = document.getElementById('buildNextSiteNowBtn');
+      const origTxt = btn ? btn.textContent : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Claude & Hermes Building & Deploying to K3s Dev...';
+      }
+      try {
+        const payload = {};
+        if (useCustom) {
+          payload.title = document.getElementById('customDevSiteTitle')?.value.trim() || '';
+          payload.description = document.getElementById('customDevSiteDesc')?.value.trim() || '';
+        }
+        const res = await fetch('/api/dev/factory/build_now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (useCustom) {
+          if (document.getElementById('customDevSiteTitle')) document.getElementById('customDevSiteTitle').value = '';
+          if (document.getElementById('customDevSiteDesc')) document.getElementById('customDevSiteDesc').value = '';
+        }
+        await pollDevAppsAndAutoOpen(true);
+        await loadState();
+        if (data.dev_app && data.dev_app.k3s_dev_url) {
+          previewDevAppInline(data.dev_app.k3s_dev_url, data.dev_app.title);
+          if (document.getElementById('autoOpenSitesToggle')?.checked ?? true) {
+            try { window.open(data.dev_app.k3s_dev_url, '_blank'); } catch (e) {}
+          }
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = origTxt || '⚡ Build & Deploy Next Site Now';
+        }
+      }
+    }
+
+    async function toggleContinuousFactory() {
+      await fetch('/api/dev/factory/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      await pollDevAppsAndAutoOpen(true);
+    }
+
     loadState();
     loadOllamaLibrary();
+    pollDevAppsAndAutoOpen();
+    setInterval(pollDevAppsAndAutoOpen, 5000);
   </script>
+
+  <div style="max-width:1200px;margin:18px auto;padding:0 16px;text-align:center;">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-1596056523034714"
+         data-ad-slot="auto"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>
+         (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
+  </div>
+
 </body>
 
 </html>

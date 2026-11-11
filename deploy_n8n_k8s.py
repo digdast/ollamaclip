@@ -496,3 +496,4 @@ print("\n[*] Restarting n8n to apply all active webhooks...")
 subprocess.run(["kubectl", "--kubeconfig", KUBECONFIG, "-n", "ai", "rollout", "restart", "deploy/n8n"])
 subprocess.run(["kubectl", "--kubeconfig", KUBECONFIG, "-n", "ai", "rollout", "status", "deploy/n8n", "--timeout=60s"])
 print("[✓] ALL AGENT WORKFLOWS SUCCESSFULLY DEPLOYED AND LIVE IN N8N!")
+

@@ -3,6 +3,77 @@ kind: Namespace
 metadata:
   name: ai
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-apps-gateway
+  namespace: dev
+  labels:
+    app: dev-apps-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-apps-gateway
+  template:
+    metadata:
+      labels:
+        app: dev-apps-gateway
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3s-cp-01
+      containers:
+      - name: dev-apps-gateway
+        image: python:3.11-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            pip install --no-cache-dir fastapi uvicorn pydantic &&
+            python /app/dev_apps_server.py
+        env:
+        - name: PORT
+          value: "8080"
+        - name: DATA_DIR
+          value: "/app/data"
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        volumeMounts:
+        - name: app-volume
+          mountPath: /app
+      volumes:
+      - name: app-volume
+        hostPath:
+          path: /var/lib/appdata/ollamaclip
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-apps-gateway
+  namespace: dev
+spec:
+  type: NodePort
+  selector:
+    app: dev-apps-gateway
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30795
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,6 +106,8 @@ spec:
           value: "http://192.168.0.17:11434"
         - name: HERMES_URL
           value: "http://192.168.0.17:7892"
+        - name: CLAUDE_URL
+          value: "http://192.168.0.17:7893"
         - name: PAPERCLIP_PORT
           value: "7891"
         - name: DATA_DIR
@@ -145,6 +218,80 @@ spec:
     targetPort: 7892
     nodePort: 30792
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude
+  namespace: ai
+  labels:
+    app: claude
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude
+  template:
+    metadata:
+      labels:
+        app: claude
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3s-cp-01
+      containers:
+      - name: claude
+        image: python:3.11-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            pip install --no-cache-dir fastapi uvicorn pydantic &&
+            python /app/claude_agent.py
+        env:
+        - name: OLLAMA_URL
+          value: "http://192.168.0.17:11434"
+        - name: PAPERCLIP_URL
+          value: "http://paperclip.ai.svc.cluster.local:7891"
+        - name: HERMES_URL
+          value: "http://192.168.0.17:7892"
+        - name: CLAUDE_SELF_URL
+          value: "http://claude.ai.svc.cluster.local:7893"
+        - name: PORT
+          value: "7893"
+        - name: DATA_DIR
+          value: "/app/data"
+        ports:
+        - containerPort: 7893
+          name: http
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 2000m
+            memory: 1Gi
+        volumeMounts:
+        - name: app-volume
+          mountPath: /app
+      volumes:
+      - name: app-volume
+        hostPath:
+          path: /var/lib/appdata/ollamaclip
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude
+  namespace: ai
+spec:
+  type: NodePort
+  selector:
+    app: claude
+  ports:
+  - name: http
+    port: 7893
+    targetPort: 7893
+    nodePort: 30793
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -194,3 +341,23 @@ spec:
             name: hermes
             port:
               number: 7892
+  - host: claude.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: claude
+            port:
+              number: 7893
+  - host: claude.ertechlab.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: claude
+            port:
+              number: 7893
