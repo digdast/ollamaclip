@@ -2,7 +2,8 @@ import os
 import subprocess
 import time
 
-subprocess.run(["pkill", "-f", "port 7893"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+subprocess.run(["pkill", "-f", "7893"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+subprocess.run(["pkill", "-f", "claude_agent"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 time.sleep(1)
 
 env = os.environ.copy()
@@ -18,7 +19,7 @@ env.update({
 
 log_f = open("/opt/hermes/claude.log", "ab")
 p = subprocess.Popen(
-    ["/opt/hermes/venv/bin/uvicorn", "claude_agent:app", "--host", "0.0.0.0", "--port", "7893"],
+    ["/opt/hermes/venv/bin/python3", "/opt/hermes/claude_agent.py"],
     cwd="/opt/hermes",
     env=env,
     stdin=subprocess.DEVNULL,
@@ -27,4 +28,4 @@ p = subprocess.Popen(
     start_new_session=True,
     close_fds=True,
 )
-print(f"Started claude_agent on port 7893 with PID {p.pid}")
+print(f"Started claude_agent (dual HTTP+HTTPS) on port 7893 with PID {p.pid}")
