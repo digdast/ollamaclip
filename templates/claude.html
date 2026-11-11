@@ -282,7 +282,10 @@
       <div class="card">
         <div class="card-title">
           <span>✴️ Claude Interactive Reasoning Console + Hermes Co-Op</span>
-          <span class="badge" id="activeModelBadge">Model: gemma4-claude:latest</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge" id="activeModelBadge">Model: qwen2.5-coder:7b</span>
+            <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.75rem" onclick="clearChatHistory()">🧹 Clear Chat</button>
+          </div>
         </div>
         <div class="chat-log" id="chatLog"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -318,6 +321,16 @@
   </div>
 
   <script>
+    let isSendingChat = false;
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     async function loadState() {
       try {
         const res = await fetch('/api/state');
@@ -326,12 +339,13 @@
         const ollama = data.ollama;
 
         const host = window.location.hostname || '192.168.0.81';
-        document.getElementById('paperclipLink').href = (host.endsWith('.ertechlab.com') && !window.location.port)
+        const isDomain = host.endsWith('.ertechlab.com') && !window.location.port;
+        document.getElementById('paperclipLink').href = isDomain
           ? 'https://clip.ertechlab.com'
-          : `${window.location.protocol}//${host}:30791`;
-        if (st.hermes_url) {
-          document.getElementById('hermesLink').href = st.hermes_url;
-        }
+          : `${window.location.protocol}//${host === '192.168.0.17' ? '192.168.0.81' : host}:30791`;
+        document.getElementById('hermesLink').href = isDomain
+          ? 'https://hermes.ertechlab.com'
+          : (st.hermes_url || `${window.location.protocol}//${host}:${window.location.port === '7893' ? '7892' : '30792'}`);
 
         const oDot = document.getElementById('ollamaDot');
         const oLabel = document.getElementById('ollamaLabel');
@@ -353,39 +367,47 @@
           cLabel.textContent = `Paperclip Offline`;
         }
 
-        document.getElementById('ollamaInput').value = st.ollama_url;
-        document.getElementById('clipInput').value = st.paperclip_url;
-        if (st.hermes_url) document.getElementById('hermesInput').value = st.hermes_url;
+        if (document.activeElement !== document.getElementById('ollamaInput')) {
+          document.getElementById('ollamaInput').value = st.ollama_url;
+        }
+        if (document.activeElement !== document.getElementById('clipInput')) {
+          document.getElementById('clipInput').value = st.paperclip_url;
+        }
+        if (st.hermes_url && document.activeElement !== document.getElementById('hermesInput')) {
+          document.getElementById('hermesInput').value = st.hermes_url;
+        }
         document.getElementById('activeModelBadge').textContent = `Model: ${st.active_model}`;
 
         const sel = document.getElementById('modelSelect');
         if (ollama && ollama.models.length > 0 && sel.options.length !== ollama.models.length) {
           sel.innerHTML = ollama.models.map(m =>
-            `<option value="${m.name}" ${m.name === st.active_model ? 'selected' : ''}>${m.name} (${m.size_gb} GB)</option>`
+            `<option value="${escapeHtml(m.name)}" ${m.name === st.active_model ? 'selected' : ''}>${escapeHtml(m.name)} (${m.size_gb} GB)</option>`
           ).join('');
         }
 
         const log = document.getElementById('chatLog');
-        if (st.chat_history && st.chat_history.length > 0) {
+        if (!isSendingChat && st.chat_history && st.chat_history.length > 0) {
+          const wasAtBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 60;
           log.innerHTML = st.chat_history.map(m => {
             if (m.role === 'user') {
-              return `<div class="msg user">${m.content}</div>`;
+              return `<div class="msg user">${escapeHtml(m.content)}</div>`;
             } else {
-              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[✴️ ${m.model}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Playbook: ' + m.learned_skill : ''}]</div>` : '';
-              return `<div class="msg agent">${meta}${m.content}</div>`;
+              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[✴️ ${escapeHtml(m.model)}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Playbook: ' + escapeHtml(m.learned_skill) : ''}]</div>` : '';
+              return `<div class="msg agent">${meta}${escapeHtml(m.content)}</div>`;
             }
           }).join('');
+          if (wasAtBottom) log.scrollTop = log.scrollHeight;
         }
 
         document.getElementById('skillCount').textContent = `${st.skills.length} playbooks`;
         document.getElementById('skillsList').innerHTML = st.skills.map(s => `
           <div class="skill-item">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <strong style="color:var(--accent);font-size:0.9rem">${s.name}</strong>
-              <span class="badge">${s.category} · Used ${s.uses}x</span>
+              <strong style="color:var(--accent);font-size:0.9rem">${escapeHtml(s.name)}</strong>
+              <span class="badge">${escapeHtml(s.category)} · Used ${s.uses}x</span>
             </div>
-            <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${s.description}</div>
-            <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${s.created_at}</div>
+            <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${escapeHtml(s.description)}</div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${escapeHtml(s.created_at)}</div>
           </div>
         `).join('');
 
@@ -393,10 +415,10 @@
         document.getElementById('memoryList').innerHTML = st.memories.map(m => `
           <div class="mem-item">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <strong style="color:var(--cyan);font-size:0.82rem">${(m.tags || []).join(', ') || 'Memory'}</strong>
-              <span style="font-size:0.74rem;color:var(--muted)">${m.timestamp}</span>
+              <strong style="color:var(--cyan);font-size:0.82rem">${escapeHtml((m.tags || []).join(', ') || 'Memory')}</strong>
+              <span style="font-size:0.74rem;color:var(--muted)">${escapeHtml(m.timestamp)}</span>
             </div>
-            <div style="font-size:0.8rem;color:var(--text)">${m.summary}</div>
+            <div style="font-size:0.8rem;color:var(--text)">${escapeHtml(m.summary)}</div>
           </div>
         `).join('');
       } catch (e) {
@@ -408,7 +430,7 @@
       const ollama_url = document.getElementById('ollamaInput').value.trim();
       const paperclip_url = document.getElementById('clipInput').value.trim();
       const hermes_url = document.getElementById('hermesInput').value.trim();
-      const active_model = document.getElementById('modelSelect').value || 'gemma4-claude:latest';
+      const active_model = document.getElementById('modelSelect').value || 'qwen2.5-coder:7b';
       await fetch('/api/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -417,13 +439,21 @@
       await loadState();
     }
 
+    async function clearChatHistory() {
+      await fetch('/api/chat/clear', { method: 'POST' });
+      await loadState();
+    }
+
     async function sendChat(coOpHermes) {
       const input = document.getElementById('chatPrompt');
       const prompt = input.value.trim();
-      if (!prompt) return;
+      if (!prompt || isSendingChat) return;
       input.value = '';
+      isSendingChat = true;
       const log = document.getElementById('chatLog');
-      log.innerHTML += `<div class="msg user">${prompt}${coOpHermes ? ' [🤝 Co-Op with Hermes]' : ''}</div>`;
+      log.innerHTML += `<div class="msg user">${escapeHtml(prompt)}${coOpHermes ? ' [🤝 Co-Op with Hermes]' : ''}</div>`;
+      const pendingId = 'pending-' + Date.now();
+      log.innerHTML += `<div class="msg agent" id="${pendingId}" style="color:var(--muted);font-style:italic">✴️ Claude is ${coOpHermes ? 'collaborating with Hermes and ' : ''}synthesizing response...</div>`;
       const btn = document.getElementById('sendBtn');
       const cBtn = document.getElementById('coopBtn');
       btn.disabled = true;
@@ -432,17 +462,27 @@
       log.scrollTop = log.scrollHeight;
 
       try {
-        const model = document.getElementById('modelSelect').value || 'gemma4-claude:latest';
-        await fetch('/api/chat', {
+        const model = document.getElementById('modelSelect').value || 'qwen2.5-coder:7b';
+        const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt, model, co_op_hermes: coOpHermes })
         });
-        await loadState();
-        log.scrollTop = log.scrollHeight;
+        const data = await res.json();
+        isSendingChat = false;
+        if (data.error) {
+          const pEl = document.getElementById(pendingId);
+          if (pEl) pEl.outerHTML = `<div class="msg agent" style="color:var(--red)">Error: ${escapeHtml(data.error)}</div>`;
+        } else {
+          await loadState();
+          log.scrollTop = log.scrollHeight;
+        }
       } catch (e) {
-        log.innerHTML += `<div class="msg agent" style="color:var(--red)">Error: ${e}</div>`;
+        isSendingChat = false;
+        const pEl = document.getElementById(pendingId);
+        if (pEl) pEl.outerHTML = `<div class="msg agent" style="color:var(--red)">Error: ${escapeHtml(String(e))}</div>`;
       } finally {
+        isSendingChat = false;
         btn.disabled = false;
         cBtn.disabled = false;
         btn.textContent = '✴️ Execute (Claude)';

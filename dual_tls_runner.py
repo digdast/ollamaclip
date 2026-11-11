@@ -54,6 +54,9 @@ def _handle_client(client_sock: socket.socket, internal_port: int, ssl_ctx):
 
 def run_dual_http_https(app, port: int, cert_dir: str = "/app/certs"):
     internal_port = port + 10000
+    local_certs = os.path.join(os.path.dirname(os.path.abspath(__file__)), "certs")
+    if not os.path.exists(os.path.join(cert_dir, "fullchain.pem")) and os.path.exists(os.path.join(local_certs, "fullchain.pem")):
+        cert_dir = local_certs
     cert_file = os.path.join(cert_dir, "fullchain.pem")
     key_file = os.path.join(cert_dir, "privkey.pem")
 

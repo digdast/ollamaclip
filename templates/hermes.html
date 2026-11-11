@@ -320,6 +320,15 @@
 
   <script>
     let currentState = null;
+    let isSendingChat = false;
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
 
     async function loadState() {
       try {
@@ -330,7 +339,10 @@
         currentState = data;
 
         const host = window.location.hostname || '192.168.0.81';
-        document.getElementById('paperclipLink').href = (host.endsWith('.ertechlab.com') && !window.location.port) ? 'https://clip.ertechlab.com' : `${window.location.protocol}//${host}:30791`;
+        const isDomain = host.endsWith('.ertechlab.com') && !window.location.port;
+        document.getElementById('paperclipLink').href = isDomain
+          ? 'https://clip.ertechlab.com'
+          : `${window.location.protocol}//${host === '192.168.0.17' ? '192.168.0.81' : host}:30791`;
 
         const oDot = document.getElementById('ollamaDot');
         const oLabel = document.getElementById('ollamaLabel');
@@ -352,38 +364,44 @@
           cLabel.textContent = `Paperclip Offline`;
         }
 
-        document.getElementById('ollamaInput').value = st.ollama_url;
-        document.getElementById('clipInput').value = st.paperclip_url;
+        if (document.activeElement !== document.getElementById('ollamaInput')) {
+          document.getElementById('ollamaInput').value = st.ollama_url;
+        }
+        if (document.activeElement !== document.getElementById('clipInput')) {
+          document.getElementById('clipInput').value = st.paperclip_url;
+        }
         document.getElementById('activeModelBadge').textContent = `Model: ${st.active_model}`;
 
         const sel = document.getElementById('modelSelect');
         if (ollama && ollama.models.length > 0 && sel.options.length !== ollama.models.length) {
           sel.innerHTML = ollama.models.map(m =>
-            `<option value="${m.name}" ${m.name === st.active_model ? 'selected' : ''}>${m.name} (${m.size_gb} GB)</option>`
+            `<option value="${escapeHtml(m.name)}" ${m.name === st.active_model ? 'selected' : ''}>${escapeHtml(m.name)} (${m.size_gb} GB)</option>`
           ).join('');
         }
 
         const log = document.getElementById('chatLog');
-        if (st.chat_history && st.chat_history.length > 0) {
+        if (!isSendingChat && st.chat_history && st.chat_history.length > 0) {
+          const wasAtBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 60;
           log.innerHTML = st.chat_history.map(m => {
             if (m.role === 'user') {
-              return `<div class="msg user">${m.content}</div>`;
+              return `<div class="msg user">${escapeHtml(m.content)}</div>`;
             } else {
-              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[${m.model}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Skill: ' + m.learned_skill : ''}]</div>` : '';
-              return `<div class="msg agent">${meta}${m.content}</div>`;
+              const meta = m.model ? `<div style="font-size:0.74rem;color:var(--accent);margin-bottom:6px;font-weight:700">[${escapeHtml(m.model)}${m.duration_ms ? ' · ' + (m.duration_ms / 1000).toFixed(1) + 's' : ''}${m.learned_skill ? ' · Skill: ' + escapeHtml(m.learned_skill) : ''}]</div>` : '';
+              return `<div class="msg agent">${meta}${escapeHtml(m.content)}</div>`;
             }
           }).join('');
+          if (wasAtBottom) log.scrollTop = log.scrollHeight;
         }
 
         document.getElementById('skillCount').textContent = `${st.skills.length} skills`;
         document.getElementById('skillsList').innerHTML = st.skills.map(s => `
       <div class="skill-item">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="color:var(--accent);font-size:0.9rem">${s.name}</strong>
-          <span class="badge">${s.category} · Used ${s.uses}x</span>
+          <strong style="color:var(--accent);font-size:0.9rem">${escapeHtml(s.name)}</strong>
+          <span class="badge">${escapeHtml(s.category)} · Used ${s.uses}x</span>
         </div>
-        <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${s.description}</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${s.created_at}</div>
+        <div style="font-size:0.82rem;color:var(--text);line-height:1.45">${escapeHtml(s.description)}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">Synthesized: ${escapeHtml(s.created_at)}</div>
       </div>
     `).join('');
 
@@ -391,10 +409,10 @@
         document.getElementById('memoryList').innerHTML = st.memories.map(m => `
       <div class="mem-item">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <strong style="color:var(--cyan);font-size:0.82rem">${(m.tags || []).join(', ') || 'Memory'}</strong>
-          <span style="font-size:0.74rem;color:var(--muted)">${m.timestamp}</span>
+          <strong style="color:var(--cyan);font-size:0.82rem">${escapeHtml((m.tags || []).join(', ') || 'Memory')}</strong>
+          <span style="font-size:0.74rem;color:var(--muted)">${escapeHtml(m.timestamp)}</span>
         </div>
-        <div style="font-size:0.8rem;color:var(--text)">${m.summary}</div>
+        <div style="font-size:0.8rem;color:var(--text)">${escapeHtml(m.summary)}</div>
       </div>
     `).join('');
       } catch (e) {
@@ -417,10 +435,11 @@
     async function sendChat() {
       const input = document.getElementById('chatPrompt');
       const prompt = input.value.trim();
-      if (!prompt) return;
+      if (!prompt || isSendingChat) return;
       input.value = '';
+      isSendingChat = true;
       const log = document.getElementById('chatLog');
-      log.innerHTML += `<div class="msg user">${prompt}</div>`;
+      log.innerHTML += `<div class="msg user">${escapeHtml(prompt)}</div>`;
       const btn = document.getElementById('sendBtn');
       btn.disabled = true;
       btn.textContent = 'Thinking...';
@@ -433,11 +452,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt, model })
         });
+        isSendingChat = false;
         await loadState();
         log.scrollTop = log.scrollHeight;
       } catch (e) {
-        log.innerHTML += `<div class="msg agent" style="color:var(--red)">Error: ${e}</div>`;
+        isSendingChat = false;
+        log.innerHTML += `<div class="msg agent" style="color:var(--red)">Error: ${escapeHtml(String(e))}</div>`;
       } finally {
+        isSendingChat = false;
         btn.disabled = false;
         btn.textContent = 'Execute & Learn';
       }

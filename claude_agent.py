@@ -187,13 +187,15 @@ def sync_with_paperclip(st: Dict[str, Any]) -> Dict[str, Any]:
         )
         with urllib.request.urlopen(req, timeout=6) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        st["paperclip_connected"] = True
-        st["last_sync"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        save_claude_state(st)
+        latest = load_claude_state()
+        latest["paperclip_connected"] = True
+        latest["last_sync"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        save_claude_state(latest)
         return {"ok": True, "data": data}
     except Exception as exc:
-        st["paperclip_connected"] = False
-        save_claude_state(st)
+        latest = load_claude_state()
+        latest["paperclip_connected"] = False
+        save_claude_state(latest)
         return {"ok": False, "error": str(exc)}
 
 
@@ -259,8 +261,7 @@ def run_claude_inference(
         with urllib.request.urlopen(f"{ollama_base}/api/ps", timeout=3) as r_ps:
             ps_models = json.loads(r_ps.read().decode("utf-8")).get("models", [])
         hot_names = [m.get("name") for m in ps_models if m.get("name")]
-        total_vram_gb = sum(m.get("size_vram", 0) for m in ps_models) / (1024 ** 3)
-        if hot_names and effective_model not in hot_names and total_vram_gb >= 15.0:
+        if hot_names and effective_model not in hot_names:
             for preferred_hot in ["gemma4-claude:latest", "qwen2.5-coder:14b", "qwen2.5-coder:7b"]:
                 if preferred_hot in hot_names:
                     effective_model = preferred_hot
@@ -676,6 +677,14 @@ async def chat_with_claude(payload: Dict[str, Any] = Body(...)):
     )
     save_claude_state(st)
     return {"reply": st["chat_history"][-1], "state": st}
+
+
+@app.post("/api/chat/clear")
+async def clear_chat_history():
+    st = load_claude_state()
+    st["chat_history"] = default_claude_state()["chat_history"]
+    save_claude_state(st)
+    return {"ok": True, "state": st}
 
 
 @app.post("/api/execute_ticket")
