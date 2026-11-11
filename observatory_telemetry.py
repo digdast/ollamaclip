@@ -288,11 +288,16 @@ def build_observatory_payload(data_dir: str) -> Dict[str, Any]:
             "steps": steps,
         })
 
-    # Also include all deployed K3s dev_apps as project history records if their ticket_id wasn't already added
-    for da in dev_apps:
-        tid = da.get("ticket_id") or f"DEV-{da.get('slug', 'app')[:6].upper()}"
-        if tid in seen_ids:
+    # Also include all deployed K3s dev_apps as project history records
+    seen_slugs = {r.get("dev_url", "").strip("/") for r in history if r.get("dev_url")}
+    for idx_da, da in enumerate(dev_apps):
+        slug = da.get("slug", "")
+        if slug and slug in seen_slugs:
             continue
+        if slug:
+            seen_slugs.add(slug)
+        raw_tid = da.get("ticket_id") or f"DEV-{idx_da + 1:02d}"
+        tid = raw_tid if raw_tid not in seen_ids else f"DEV-{idx_da + 1:02d}"
         seen_ids.add(tid)
         aname = da.get("agent_name", "Claude-01 + Hermes-01")
         avatar = da.get("agent_avatar", "✴️")
