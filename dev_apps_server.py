@@ -5,6 +5,7 @@ Serves all websites and web applications built autonomously by Claude, Hermes, a
 Includes mandatory Google AdSense (ca-pub-1596056523034714) and /ads.txt on all public pages.
 """
 
+import asyncio
 import json
 import os
 import time
@@ -14,8 +15,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
+from observatory_telemetry import build_observatory_payload
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 APP_PORT = int(os.environ.get("PORT", "8080"))
-DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+DATA_DIR = os.environ.get("DATA_DIR", os.path.join(BASE_DIR, "data"))
 DEV_APPS_DIR = os.path.join(DATA_DIR, "dev_apps")
 STATE_FILE = os.path.join(DATA_DIR, "paperclip_state.json")
 ADS_TXT_CONTENT = "google.com, pub-1596056523034714, DIRECT, f08c47fec0942fa0\n"
@@ -68,6 +73,24 @@ async def healthz():
 async def api_list_apps():
     apps = load_dev_apps()
     return {"ok": True, "namespace": "dev", "count": len(apps), "apps": apps}
+
+
+@app.get("/api/observatory")
+async def api_observatory():
+    data = await asyncio.to_thread(build_observatory_payload, DATA_DIR)
+    return JSONResponse(content=data)
+
+
+@app.get("/observatory", response_class=HTMLResponse)
+@app.get("/observatory/", response_class=HTMLResponse)
+@app.get("/swarm-observatory", response_class=HTMLResponse)
+@app.get("/swarm-observatory/", response_class=HTMLResponse)
+@app.get("/agent-swarm-observatory", response_class=HTMLResponse)
+@app.get("/agent-swarm-observatory/", response_class=HTMLResponse)
+async def serve_observatory_ui():
+    obs_path = os.path.join(TEMPLATES_DIR, "observatory.html")
+    with open(obs_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 
 @app.get("/{slug}/ads.txt", response_class=PlainTextResponse)
@@ -155,7 +178,8 @@ async def serve_portal():
         <h1 style="margin:4px 0 0 0;font-size:24px;">🚀 K3s Dev Autonomous Website &amp; App Hosting Gateway</h1>
         <div style="font-size:13px;color:#94a3b8;margin-top:4px;">Continuously built and deployed by <strong>Claude-01 (✴️)</strong>, <strong>Hermes-01 (🪽)</strong>, and the <strong>Paperclip AI Swarm</strong>.</div>
       </div>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="/observatory" class="btn" style="width:auto;padding:10px 18px;background:linear-gradient(135deg,#d97757,#7e22ce);">🔭 Open Agent Swarm Collaboration &amp; Resource Observatory ↗</a>
         <a href="http://192.168.0.81:30791" class="btn" style="width:auto;padding:10px 18px;">📎 Back to Paperclip Control Plane (30791)</a>
       </div>
     </div>
@@ -177,5 +201,5 @@ async def serve_portal():
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=APP_PORT)
+    from dual_tls_runner import run_dual_http_https
+    run_dual_http_https(app, port=APP_PORT)

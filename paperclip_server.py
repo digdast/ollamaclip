@@ -3587,6 +3587,22 @@ async def trigger_dev_factory_build_now(payload: Dict[str, Any] = Body(default={
     }
 
 
+@app.get("/api/observatory")
+async def get_observatory_telemetry():
+    from observatory_telemetry import build_observatory_payload
+    return await asyncio.to_thread(build_observatory_payload, DATA_DIR)
+
+
+@app.get("/observatory", response_class=HTMLResponse)
+@app.get("/observatory/", response_class=HTMLResponse)
+@app.get("/swarm-observatory", response_class=HTMLResponse)
+@app.get("/swarm-observatory/", response_class=HTMLResponse)
+async def serve_observatory_on_paperclip():
+    obs_path = os.path.join(TEMPLATES_DIR, "observatory.html")
+    with open(obs_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
 @app.get("/dev-apps/{slug}/ads.txt")
 async def serve_dev_app_ads_txt(slug: str):
     from fastapi.responses import PlainTextResponse

@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Swarm Observatory — Live Collaboration Graphs, Project History &amp; Resource Telemetry</title>
+  <!-- Google AdSense with Page-Level Auto-Ads -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1596056523034714"
+     crossorigin="anonymous"></script>
+  <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: "ca-pub-1596056523034714",
+      enable_page_level_ads: true
+    });
+  </script>
+  <style>
+    :root {
+      --bg-deep: #050811;
+      --bg-panel: #0d1324;
+      --bg-card: #121a30;
+      --bg-hover: #192340;
+      --border: #233056;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --text-muted: #64748b;
+      --cyan: #38bdf8;
+      --emerald: #10b981;
+      --purple: #a855f7;
+      --claude: #d97757;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(217, 119, 87, 0.14), transparent 36%),
+        radial-gradient(circle at 88% 5%, rgba(56, 189, 248, 0.14), transparent 38%),
+        radial-gradient(circle at 50% 90%, rgba(168, 85, 247, 0.10), transparent 45%),
+        var(--bg-deep);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8, 12, 24, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, var(--claude), var(--purple), var(--cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 21px;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.35);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      transition: all 0.18s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--cyan);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7e22ce, #0284c7);
+      border-color: rgba(56, 189, 248, 0.5);
+      color: #fff;
+    }
+
+    .btn-claude {
+      background: linear-gradient(135deg, #d97757, #b45309);
+      border-color: rgba(217, 119, 87, 0.6);
+      color: #fff;
+    }
+
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #0284c7);
+      border-color: rgba(16, 185, 129, 0.5);
+      color: #fff;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
+      display: inline-block;
+      animation: pulseGlow 2s infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.28); opacity: 0.65; }
+    }
+
+    .container {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 22px 28px 48px;
+    }
+
+    /* KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .kpi-card {
+      background: linear-gradient(160deg, rgba(18, 26, 48, 0.95), rgba(11, 17, 32, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-label {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-sub);
+      font-weight: 700;
+    }
+
+    .kpi-val {
+      font-size: 26px;
+      font-weight: 800;
+      margin: 6px 0 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 7px;
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.5s ease;
+    }
+
+    /* Panels & Grid Layouts */
+    .panel {
+      background: rgba(13, 19, 36, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 22px;
+    }
+
+    .panel-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(35, 48, 86, 0.65);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: monospace;
+      background: rgba(56, 189, 248, 0.13);
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .badge-claude {
+      background: rgba(217, 119, 87, 0.16);
+      color: #fdba74;
+      border-color: rgba(217, 119, 87, 0.45);
+    }
+
+    .badge-coop {
+      background: rgba(168, 85, 247, 0.18);
+      color: #d8b4fe;
+      border-color: rgba(168, 85, 247, 0.45);
+    }
+
+    .badge-emerald {
+      background: rgba(16, 185, 129, 0.16);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.45);
+    }
+
+    .top-split {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+
+    @media (max-width: 1180px) {
+      .top-split, .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Collaboration SVG Network Canvas */
+    .topology-wrap {
+      background: radial-gradient(circle at 50% 50%, rgba(30, 41, 82, 0.45), rgba(5, 8, 17, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      height: 460px;
+    }
+
+    .topology-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      background: rgba(5, 8, 17, 0.85);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: var(--text-sub);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-line {
+      width: 18px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* Live Handshake Stream */
+    .stream-list {
+      max-height: 460px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+
+    .stream-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12.5px;
+    }
+
+    /* Agent Workload Cards */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .agent-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+    }
+
+    .agent-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .avatar-box {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .project-pill {
+      display: block;
+      background: rgba(5, 8, 17, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+
+    .project-pill:hover {
+      border-color: var(--emerald);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    /* Resource Meters */
+    .resource-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .res-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    /* History Table */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .input-box {
+      background: #060a15;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12.5px;
+    }
+
+    .history-table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    th, td {
+      padding: 11px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(35, 48, 86, 0.6);
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--text-sub);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      background: rgba(5, 8, 17, 0.6);
+    }
+
+    tr:hover td {
+      background: rgba(25, 35, 64, 0.45);
+    }
+
+    canvas.chart-canvas {
+      width: 100%;
+      height: 270px;
+      display: block;
+    }
+
+    /* Inline Preview Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 6, 14, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 1320px;
+      height: 86vh;
+      background: var(--bg-panel);
+      border: 1px solid var(--cyan);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🔭</div>
+      <div>
+        <div class="brand-title">Sovereign AI Swarm Observatory — Collaboration, Projects &amp; Resource Graphs</div>
+        <div class="brand-sub">
+          <span class="pulse-dot"></span>
+          <span style="margin-left:6px;" id="liveSyncStatus">Streaming real-time telemetry from Paperclip (30791), Claude (30793/7893), Hermes (30792/7892), K3s Dev (30795) &amp; Ollama GPU (192.168.0.17)...</span>
+        </div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <button class="btn btn-primary" onclick="fetchObservatory()">🔄 Refresh Telemetry</button>
+      <a class="btn btn-claude" id="navClaudeLink" href="https://claude.ertechlab.com" target="_blank">✴️ Claude UI ↗</a>
+      <a class="btn" id="navHermesLink" href="https://hermes.ertechlab.com" target="_blank" style="border-color:rgba(56,189,248,0.5);">🪽 Hermes UI ↗</a>
+      <a class="btn btn-emerald" id="navDevPortalLink" href="/" target="_blank">🚀 K3s Dev Sites Portal ↗</a>
+      <a class="btn" id="navPaperclipLink" href="https://clip.ertechlab.com" target="_blank">📎 Paperclip Control Plane ↗</a>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- KPI TELEMETRY STRIP -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Active Swarm Agents &amp; Nodes</div>
+        <div class="kpi-val" style="color:var(--cyan);" id="kpiAgents">8 Agents</div>
+        <div class="kpi-sub" id="kpiNodesSub">4 Worker Nodes (K3s + GPU Host 17)</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--cyan);"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">🤝 Claude ⇄ Hermes Co-Op Sessions</div>
+        <div class="kpi-val" style="color:var(--purple);" id="kpiCoopCount">0</div>
+        <div class="kpi-sub" id="kpiSkillsSub">0 Shared Skills &amp; Playbooks Synthesized</div>
+        <div class="progress-bar"><div class="progress-fill" id="kpiCoopBar" style="width:75%;background:linear-gradient(90deg,var(--claude),var(--purple));"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">🚀 K3s Dev Websites &amp; Projects</div>
+        <div class="kpi-val" style="color:var(--emerald);" id="kpiProjectsCount">0</div>
+        <div class="kpi-sub" id="kpiTicketsSub">0 Total Tickets Executed</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:90%;background:var(--emerald);"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">⚡ Total LLM Tokens &amp; Velocity</div>
+        <div class="kpi-val" style="color:var(--claude);" id="kpiTokensTotal">0</div>
+        <div class="kpi-sub" id="kpiSpeedSub">Avg Speed: -- tok/sec • $0.00 Local GPU</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:85%;background:var(--claude);"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">🔥 GPU VRAM (192.168.0.17:11434)</div>
+        <div class="kpi-val" style="color:var(--amber);" id="kpiVramUsed">-- GB</div>
+        <div class="kpi-sub" id="kpiVramModels">Checking hot models in VRAM...</div>
+        <div class="progress-bar"><div class="progress-fill" id="kpiVramBar" style="width:0%;background:var(--amber);"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">☸️ K3s Cluster CPU &amp; RAM</div>
+        <div class="kpi-val" style="color:#a7f3d0;" id="kpiSysRam">--% RAM</div>
+        <div class="kpi-sub" id="kpiSysCpu">CPU Load: -- • NVMe Disk: --%</div>
+        <div class="progress-bar"><div class="progress-fill" id="kpiRamBar" style="width:0%;background:var(--emerald);"></div></div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: INTERACTIVE AGENT COLLABORATION NETWORK GRAPH + LIVE CO-OP HANDSHAKE STREAM -->
+    <div class="top-split">
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">
+            <span>🕸️ Live Multi-Agent Collaboration Topology &amp; Dataflow Graph</span>
+            <span class="badge badge-coop" id="activeFlowBadge">Claude ⇄ Hermes 2-Phase Co-Op Active</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-sub);">Click any node to filter its projects &amp; history</div>
+        </div>
+        <div class="topology-wrap" id="topologyContainer">
+          <svg id="collabSvg" viewBox="0 0 920 450" style="width:100%;height:100%;display:block;"></svg>
+          <div class="topology-legend">
+            <div class="legend-item"><span class="legend-line" style="background:linear-gradient(90deg,#d97757,#a855f7);"></span> Claude ⇄ Hermes Co-Op</div>
+            <div class="legend-item"><span class="legend-line" style="background:#38bdf8;"></span> Paperclip Ticket Dispatch</div>
+            <div class="legend-item"><span class="legend-line" style="background:#f59e0b;"></span> Ollama GPU Inference (/v1/messages)</div>
+            <div class="legend-item"><span class="legend-line" style="background:#10b981;"></span> K3s <code>dev</code> Website Deploy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">
+            <span>⚡ Live Agent Collaboration &amp; Execution Stream</span>
+          </div>
+          <span class="badge badge-emerald">Real-Time Trace</span>
+        </div>
+        <div class="stream-list" id="collabStreamList"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: 4 ANALYTICAL GRAPHS (AGENT ACTIVITY, COLLABORATION VELOCITY, GPU/CPU RESOURCES, SKILLS VAULT) -->
+    <div class="charts-grid">
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">📊 Graph 1: Agent Workload, Tokens Generated &amp; Tasks Completed</div>
+          <span class="badge">Per-Agent Output</span>
+        </div>
+        <canvas id="chartAgentWorkload" class="chart-canvas"></canvas>
+      </div>
+
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">🤝 Graph 2: Collaboration Velocity &amp; Ticket Token History</div>
+          <span class="badge badge-coop">Co-Op vs Solo Execution</span>
+        </div>
+        <canvas id="chartCollabHistory" class="chart-canvas"></canvas>
+      </div>
+
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">🔥 Graph 3: GPU VRAM Model Footprint &amp; K3s Node Resources</div>
+          <span class="badge badge-claude">Host 17 GPU + K3s Node</span>
+        </div>
+        <canvas id="chartResources" class="chart-canvas"></canvas>
+        <div class="resource-row" id="vramModelsBreakdown"></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:0;">
+        <div class="panel-hdr">
+          <div class="panel-title">🧠 Graph 4: Synthesized Playbooks, Skills &amp; Episodic Memory Growth</div>
+          <span class="badge badge-emerald">Self-Improving Vault</span>
+        </div>
+        <canvas id="chartSkillsGrowth" class="chart-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- SECTION 3: WHAT PROJECTS EACH AGENT IS WORKING ON RIGHT NOW -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <span>🏗️ Active Agent Roster — Current Projects, Collaborations &amp; Resource Usage</span>
+          <span class="badge" id="rosterFilterBadge" style="display:none;cursor:pointer;" onclick="clearAgentFilter()">✕ Clear Filter</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-sub);">
+          Shows each agent's live status, assigned LLM model, active/recent projects, collaboration partner, and token consumption.
+        </div>
+      </div>
+      <div class="agent-grid" id="agentProjectsGrid"></div>
+    </div>
+
+    <!-- SECTION 4: LIVE K3S DEV WEBSITES & APPLICATIONS BUILT BY THE AGENTS -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <span>🌐 Live Websites &amp; Applications Deployed to K3s <code>dev</code> Namespace</span>
+          <span class="badge badge-emerald" id="devAppsCountBadge">0 Live Sites</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-sub);">
+          Built autonomously by Claude-01 + Hermes-01 Co-Op and served live on K3s NodePort <code>30795</code> / <code>https://dev.ertechlab.com</code>.
+        </div>
+      </div>
+      <div class="agent-grid" id="devSitesGrid"></div>
+    </div>
+
+    <!-- SECTION 5: COMPLETE PROJECT & TICKET COLLABORATION HISTORY TABLE -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <span>📜 Complete Project, Ticket &amp; Collaboration History</span>
+          <span class="badge" id="historyCountBadge">0 Records</span>
+        </div>
+        <div class="filter-bar">
+          <select id="filterAgentSelect" class="input-box" onchange="renderHistoryTable()">
+            <option value="ALL">All Agents &amp; Nodes</option>
+            <option value="CLAUDE">✴️ Claude Agents Only</option>
+            <option value="HERMES">🪽 Hermes Agents Only</option>
+            <option value="COOP">🤝 Claude + Hermes Co-Op Only</option>
+            <option value="DEV_SITE">🌐 K3s Dev Websites Only</option>
+          </select>
+          <input type="text" id="filterSearchInput" class="input-box" placeholder="🔍 Search project, ticket, model, skill..." oninput="renderHistoryTable()" style="width:250px;" />
+        </div>
+      </div>
+      <div class="history-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket / Time</th>
+              <th>Project / Task Title</th>
+              <th>Assigned &amp; Collaborating Agents</th>
+              <th>LLM Model(s)</th>
+              <th>Resources (Tokens / Speed)</th>
+              <th>Synthesized Skill / Playbook</th>
+              <th>Deliverable / Live K3s Site</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GOOGLE ADSENSE RESPONSIVE DISPLAY UNIT -->
+    <div style="max-width:1200px;margin:24px auto 8px;padding:12px;text-align:center;background:rgba(13,19,36,0.7);border:1px solid var(--border);border-radius:12px;">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-1596056523034714"
+           data-ad-slot="auto"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </div>
+
+  </div>
+
+  <!-- INLINE WEBSITE PREVIEW MODAL -->
+  <div class="modal-backdrop" id="previewModal">
+    <div class="modal-box">
+      <div style="padding:12px 18px;background:#070b16;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="badge badge-emerald">K3s Namespace: dev</span>
+          <strong id="previewModalTitle" style="font-size:14px;">Live Website Preview</strong>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a id="previewModalOpenBtn" href="#" target="_blank" class="btn btn-emerald" style="padding:5px 12px;font-size:12px;">🚀 Open in New Tab ↗</a>
+          <button class="btn" onclick="closePreviewModal()" style="padding:5px 12px;font-size:12px;">✕ Close</button>
+        </div>
+      </div>
+      <iframe id="previewModalFrame" src="about:blank" style="width:100%;flex:1;border:none;background:#050811;"></iframe>
+    </div>
+  </div>
+
+  <script>
+    let obsData = null;
+    let selectedAgentFilter = null;
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Configure dynamic host links
+    (function setupNavLinks() {
+      const host = window.location.hostname || '192.168.0.81';
+      const isDomain = host.endsWith('.ertechlab.com') && !window.location.port;
+      document.getElementById('navClaudeLink').href = isDomain ? 'https://claude.ertechlab.com' : `${window.location.protocol}//${host}:30793`;
+      document.getElementById('navHermesLink').href = isDomain ? 'https://hermes.ertechlab.com' : `${window.location.protocol}//${host}:30792`;
+      document.getElementById('navPaperclipLink').href = isDomain ? 'https://clip.ertechlab.com' : `${window.location.protocol}//${host}:30791`;
+      document.getElementById('navDevPortalLink').href = isDomain ? 'https://dev.ertechlab.com/' : `${window.location.protocol}//${host}:30795/`;
+    })();
+
+    async function fetchObservatory() {
+      try {
+        const res = await fetch('/api/observatory');
+        obsData = await res.json();
+        renderAll();
+      } catch (e) {
+        console.error('Observatory fetch error:', e);
+      }
+    }
+
+    function renderAll() {
+      if (!obsData) return;
+      renderKpis();
+      renderCollaborationTopology();
+      renderCollabStream();
+      renderAgentProjects();
+      renderDevSites();
+      renderHistoryTable();
+      drawAllCharts();
+      document.getElementById('liveSyncStatus').textContent =
+        `Live Telemetry Synced at ${obsData.timestamp} • ${obsData.summary.agents_count} Agents • ${obsData.summary.nodes_count} Worker Nodes • ${obsData.summary.dev_apps_count} K3s Dev Sites`;
+    }
+
+    function renderKpis() {
+      const s = obsData.summary;
+      const res = obsData.resources;
+      document.getElementById('kpiAgents').textContent = `${s.agents_count} Agents`;
+      document.getElementById('kpiNodesSub').textContent = `${s.nodes_count} Nodes (K3s + GPU Host 17)`;
+      document.getElementById('kpiCoopCount').textContent = `${s.coop_sessions} Co-Op Runs`;
+      document.getElementById('kpiSkillsSub').textContent = `${s.total_skills} Playbooks & Skills • ${s.total_memories} Memories`;
+      document.getElementById('kpiProjectsCount').textContent = `${s.dev_apps_count} Live Sites`;
+      document.getElementById('kpiTicketsSub').textContent = `${s.tickets_count} Total Tickets Completed`;
+      document.getElementById('kpiTokensTotal').textContent = (s.total_tokens || 0).toLocaleString();
+      document.getElementById('kpiSpeedSub').textContent = `Avg Velocity: ${s.avg_tok_per_sec} tok/s • $0.00 Local GPU`;
+
+      const vramUsed = res.gpu_vram_used_gb || 0;
+      const vramTotal = res.gpu_vram_total_gb || 22.0;
+      const vramPct = Math.min(100, Math.round((vramUsed / vramTotal) * 100));
+      document.getElementById('kpiVramUsed').textContent = `${vramUsed.toFixed(1)} / ${vramTotal.toFixed(0)} GB`;
+      const hotNames = (res.gpu_ps_models || []).map(m => `${m.name} (${m.vram_gb}G)`).join(', ') || 'Idle (0 GB loaded)';
+      document.getElementById('kpiVramModels').textContent = hotNames;
+      document.getElementById('kpiVramBar').style.width = `${vramPct}%`;
+
+      document.getElementById('kpiSysRam').textContent = `${res.ram_used_pct}% RAM`;
+      document.getElementById('kpiSysCpu').textContent = `CPU: ${res.cpu_load_pct}% (${res.cpu_cores} cores) • Disk: ${res.disk_used_pct}%`;
+      document.getElementById('kpiRamBar').style.width = `${res.ram_used_pct}%`;
+    }
+
+    function renderCollaborationTopology() {
+      const svg = document.getElementById('collabSvg');
+      const s = obsData.summary;
+      const nodes = [
+        { id: 'paperclip', label: 'Paperclip Control Plane', sub: 'K3s :30791 • Orchestrator', x: 460, y: 58, color: '#38bdf8', icon: '📎' },
+        { id: 'agent-ceo', label: 'CEO Atlas', sub: 'Executive Strategy', x: 145, y: 65, color: '#38bdf8', icon: '👑' },
+        { id: 'agent-cto', label: 'CTO Vega', sub: 'Architecture & Hiring', x: 775, y: 65, color: '#38bdf8', icon: '🧠' },
+        { id: 'agent-claude', label: 'Claude-01 (K3s)', sub: 'Pod :30793 • Phase 1 Lead', x: 250, y: 205, color: '#d97757', icon: '✴️' },
+        { id: 'agent-hermes', label: 'Hermes-01 (K3s)', sub: 'Pod :30792 • Phase 2 Co-Op', x: 670, y: 205, color: '#a855f7', icon: '🪽' },
+        { id: 'claude-host-17', label: 'Claude-Host-17', sub: 'GPU Host :7893 • Anthropic API', x: 120, y: 315, color: '#d97757', icon: '✴️' },
+        { id: 'hermes-host-17', label: 'Hermes-Host-17', sub: 'GPU Host :7892 • Skill Vault', x: 800, y: 315, color: '#a855f7', icon: '🪽' },
+        { id: 'ollama', label: 'Ollama GPU Cluster', sub: '192.168.0.17:11434 (' + (obsData.resources.gpu_vram_used_gb || 0).toFixed(1) + 'GB VRAM)', x: 460, y: 375, color: '#f59e0b', icon: '🔥' },
+        { id: 'k3s-dev', label: 'K3s dev Gateway', sub: 'NodePort :30795 (' + s.dev_apps_count + ' Live Sites)', x: 460, y: 205, color: '#10b981', icon: '🚀' }
+      ];
+
+      const edges = [
+        // Paperclip dispatches
+        { from: 'paperclip', to: 'agent-claude', color: '#38bdf8', width: 2.2, label: 'Ticket Dispatch', dash: '6,4' },
+        { from: 'paperclip', to: 'agent-hermes', color: '#38bdf8', width: 2.2, label: 'Ticket Dispatch', dash: '6,4' },
+        { from: 'agent-ceo', to: 'paperclip', color: '#38bdf8', width: 1.8, label: 'Directives', dash: '' },
+        { from: 'agent-cto', to: 'paperclip', color: '#38bdf8', width: 1.8, label: 'Org & Specs', dash: '' },
+        // Claude <-> Hermes Co-Op Bridge (Top & Bottom arcs)
+        { from: 'agent-claude', to: 'agent-hermes', color: '#a855f7', width: 3.5, label: '🤝 2-Phase Co-Op Bridge', arc: -65 },
+        { from: 'claude-host-17', to: 'hermes-host-17', color: '#d97757', width: 2.6, label: 'Host 17 Co-Op Sync', arc: 55 },
+        { from: 'agent-claude', to: 'claude-host-17', color: '#d97757', width: 2.0, label: 'Playbook Sync' },
+        { from: 'agent-hermes', to: 'hermes-host-17', color: '#a855f7', width: 2.0, label: 'Skill Sync' },
+        // Deployment to K3s dev
+        { from: 'agent-claude', to: 'k3s-dev', color: '#10b981', width: 2.8, label: 'HTML5 App' },
+        { from: 'agent-hermes', to: 'k3s-dev', color: '#10b981', width: 2.8, label: 'Verify & Deploy' },
+        // Ollama GPU inference links
+        { from: 'agent-claude', to: 'ollama', color: '#f59e0b', width: 2.2, label: '/v1/messages' },
+        { from: 'agent-hermes', to: 'ollama', color: '#f59e0b', width: 2.2, label: '/api/chat' },
+        { from: 'claude-host-17', to: 'ollama', color: '#f59e0b', width: 2.2, label: 'Local GPU' },
+        { from: 'hermes-host-17', to: 'ollama', color: '#f59e0b', width: 2.2, label: 'Local GPU' }
+      ];
+
+      const nodeMap = {};
+      nodes.forEach(n => nodeMap[n.id] = n);
+
+      let svgHtml = `
+        <defs>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+      `;
+
+      edges.forEach((e, idx) => {
+        const n1 = nodeMap[e.from];
+        const n2 = nodeMap[e.to];
+        if (!n1 || !n2) return;
+        let pathD = '';
+        let midX = (n1.x + n2.x) / 2;
+        let midY = (n1.y + n2.y) / 2;
+        if (e.arc) {
+          midY += e.arc;
+          pathD = `M ${n1.x} ${n1.y} Q ${midX} ${midY} ${n2.x} ${n2.y}`;
+        } else {
+          pathD = `M ${n1.x} ${n1.y} L ${n2.x} ${n2.y}`;
+        }
+        const pathId = `edge-path-${idx}`;
+        svgHtml += `
+          <path id="${pathId}" d="${pathD}" fill="none" stroke="${e.color}" stroke-width="${e.width}" stroke-opacity="0.55" ${e.dash ? `stroke-dasharray="${e.dash}"` : ''} />
+          <circle r="4.5" fill="${e.color}" filter="url(#glow)">
+            <animateMotion dur="${2.2 + (idx % 3) * 0.7}s" repeatCount="indefinite">
+              <mpath href="#${pathId}" />
+            </animateMotion>
+          </circle>
+        `;
+        if (e.label) {
+          const labelY = e.arc ? (n1.y + n2.y) / 2 + (e.arc * 0.55) : midY - 6;
+          svgHtml += `
+            <text x="${midX}" y="${labelY}" fill="#cbd5e1" font-size="10.5" font-weight="600" text-anchor="middle" style="paint-order:stroke;stroke:#050811;stroke-width:4px;">${escapeHtml(e.label)}</text>
+          `;
+        }
+      });
+
+      nodes.forEach(n => {
+        const isSelected = selectedAgentFilter && n.id.includes(selectedAgentFilter.toLowerCase());
+        const strokeW = isSelected ? 3.2 : 1.8;
+        svgHtml += `
+          <g style="cursor:pointer;" onclick="filterByTopologyNode('${n.id}')">
+            <rect x="${n.x - 92}" y="${n.y - 28}" width="184" height="56" rx="12" fill="#0d1428" stroke="${n.color}" stroke-width="${strokeW}" />
+            <text x="${n.x - 74}" y="${n.y + 5}" font-size="20">${n.icon}</text>
+            <text x="${n.x - 46}" y="${n.y - 4}" fill="#f8fafc" font-size="12.5" font-weight="800">${escapeHtml(n.label)}</text>
+            <text x="${n.x - 46}" y="${n.y + 13}" fill="#94a3b8" font-size="10.2" font-family="monospace">${escapeHtml(n.sub)}</text>
+          </g>
+        `;
+      });
+
+      svg.innerHTML = svgHtml;
+    }
+
+    function filterByTopologyNode(nodeId) {
+      if (nodeId.includes('claude')) {
+        selectedAgentFilter = 'claude';
+        document.getElementById('filterAgentSelect').value = 'CLAUDE';
+      } else if (nodeId.includes('hermes')) {
+        selectedAgentFilter = 'hermes';
+        document.getElementById('filterAgentSelect').value = 'HERMES';
+      } else if (nodeId === 'k3s-dev') {
+        selectedAgentFilter = null;
+        document.getElementById('filterAgentSelect').value = 'DEV_SITE';
+      } else {
+        selectedAgentFilter = nodeId;
+        document.getElementById('filterAgentSelect').value = 'ALL';
+      }
+      const badge = document.getElementById('rosterFilterBadge');
+      if (selectedAgentFilter) {
+        badge.style.display = 'inline-flex';
+        badge.textContent = `Filtered: ${selectedAgentFilter.toUpperCase()} (✕ Clear)`;
+      } else {
+        badge.style.display = 'none';
+      }
+      renderAgentProjects();
+      renderHistoryTable();
+      renderCollaborationTopology();
+    }
+
+    function clearAgentFilter() {
+      selectedAgentFilter = null;
+      document.getElementById('rosterFilterBadge').style.display = 'none';
+      document.getElementById('filterAgentSelect').value = 'ALL';
+      renderAgentProjects();
+      renderHistoryTable();
+      renderCollaborationTopology();
+    }
+
+    function renderCollabStream() {
+      const container = document.getElementById('collabStreamList');
+      const events = obsData.collaboration_events || [];
+      if (events.length === 0) {
+        container.innerHTML = `<div class="stream-item">Waiting for agent telemetry events...</div>`;
+        return;
+      }
+      container.innerHTML = events.map(ev => {
+        const isCoop = ev.is_coop;
+        const badgeCls = isCoop ? 'badge-coop' : (ev.agent_type === 'claude' ? 'badge-claude' : '');
+        const devLink = ev.dev_url
+          ? `<a href="${escapeHtml(ev.dev_url)}" target="_blank" class="badge badge-emerald" style="text-decoration:none;margin-left:6px;">🚀 Live Site ↗</a>`
+          : '';
+        const stepsHtml = (ev.steps || []).slice(0, 4).map(st =>
+          `<div style="font-size:11px;color:var(--text-sub);font-family:monospace;margin-top:3px;">• <strong style="color:var(--cyan);">${escapeHtml(st.step)}</strong>: ${escapeHtml(st.detail)} <span style="color:var(--text-muted);">(${escapeHtml(st.time)})</span></div>`
+        ).join('');
+        return `
+          <div class="stream-item">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;">
+              <div>
+                <span class="badge ${badgeCls}">${escapeHtml(ev.badge)}</span>
+                <strong style="margin-left:6px;color:var(--text-main);">${escapeHtml(ev.title)}</strong>
+                ${devLink}
+              </div>
+              <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">${escapeHtml(ev.timestamp)}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">
+              Agents: <strong style="color:#f8fafc;">${escapeHtml(ev.agents_label)}</strong> • Model: <code>${escapeHtml(ev.model)}</code> •
+              <strong>${(ev.tokens || 0).toLocaleString()} tok</strong> (${ev.tok_per_sec || 0} tok/s)
+            </div>
+            ${ev.skill ? `<div style="font-size:11.5px;color:#6ee7b7;">Synthesized Playbook/Skill: <code>${escapeHtml(ev.skill)}</code></div>` : ''}
+            ${stepsHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAgentProjects() {
+      const grid = document.getElementById('agentProjectsGrid');
+      let agents = obsData.agents_detailed || [];
+      if (selectedAgentFilter) {
+        agents = agents.filter(a =>
+          a.id.toLowerCase().includes(selectedAgentFilter.toLowerCase()) ||
+          a.name.toLowerCase().includes(selectedAgentFilter.toLowerCase()) ||
+          (a.adapter || '').toLowerCase().includes(selectedAgentFilter.toLowerCase())
+        );
+      }
+
+      grid.innerHTML = agents.map(a => {
+        const isClaude = (a.adapter || '').includes('claude') || a.name.toLowerCase().includes('claude');
+        const isHermes = (a.adapter || '').includes('hermes') || a.name.toLowerCase().includes('hermes');
+        const partnerBadge = isClaude
+          ? `<span class="badge badge-coop">🤝 Co-Op Partner: Hermes-01</span>`
+          : (isHermes ? `<span class="badge badge-coop">🤝 Co-Op Partner: Claude-01</span>` : `<span class="badge">${escapeHtml(a.department || 'Executive')}</span>`);
+
+        const projectsHtml = (a.recent_projects || []).slice(0, 3).map(p => `
+          <div class="project-pill">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+              <strong style="color:var(--cyan);font-size:12px;">${escapeHtml(p.id)}: ${escapeHtml(p.title)}</strong>
+              <span style="font-size:10.5px;color:var(--text-muted);font-family:monospace;">${(p.tokens || 0)} tok</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:11px;color:var(--text-sub);">
+              <span>Model: <code>${escapeHtml(p.model)}</code></span>
+              ${p.dev_url ? `<a href="${escapeHtml(p.dev_url)}" target="_blank" style="color:var(--emerald);font-weight:700;text-decoration:none;">🚀 Open Site ↗</a>` : `<span>✓ ${escapeHtml(p.status)}</span>`}
+            </div>
+          </div>
+        `).join('') || `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Standing by for next ticket dispatch...</div>`;
+
+        return `
+          <div class="agent-card">
+            <div>
+              <div class="agent-hdr">
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <div class="avatar-box">${a.avatar || '🤖'}</div>
+                  <div>
+                    <div style="font-size:15px;font-weight:800;">${escapeHtml(a.name)}</div>
+                    <div style="font-size:12px;color:var(--text-sub);">${escapeHtml(a.role)}</div>
+                  </div>
+                </div>
+                <span class="badge badge-emerald">${escapeHtml(a.status || 'ONLINE')}</span>
+              </div>
+
+              <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+                ${partnerBadge}
+                <span class="badge">Model: ${escapeHtml(a.model)}</span>
+                ${a.endpoint ? `<a href="${escapeHtml(a.endpoint)}" target="_blank" class="badge badge-claude" style="text-decoration:none;">Console ↗</a>` : ''}
+              </div>
+
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;background:rgba(5,8,17,0.6);padding:8px 10px;border-radius:8px;text-align:center;">
+                <div>
+                  <div style="font-size:10.5px;color:var(--text-sub);">TOKENS</div>
+                  <div style="font-size:14px;font-weight:800;color:var(--cyan);font-family:monospace;">${(a.tokens_used || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div style="font-size:10.5px;color:var(--text-sub);">PROJECTS</div>
+                  <div style="font-size:14px;font-weight:800;color:var(--emerald);font-family:monospace;">${a.projects_count || 0}</div>
+                </div>
+                <div>
+                  <div style="font-size:10.5px;color:var(--text-sub);">SKILLS</div>
+                  <div style="font-size:14px;font-weight:800;color:var(--purple);font-family:monospace;">${a.skills_count || 0}</div>
+                </div>
+              </div>
+
+              <div style="margin-top:12px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-sub);letter-spacing:0.05em;">
+                  Active &amp; Recent Projects Worked On:
+                </div>
+                ${projectsHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDevSites() {
+      const apps = obsData.dev_apps || [];
+      document.getElementById('devAppsCountBadge').textContent = `${apps.length} Live Sites in K3s dev`;
+      const grid = document.getElementById('devSitesGrid');
+      if (apps.length === 0) {
+        grid.innerHTML = `<div class="agent-card">Autonomous factory is building the next K3s dev website...</div>`;
+        return;
+      }
+      grid.innerHTML = apps.map(app => {
+        const siteUrl = `/${app.slug}/`;
+        return `
+          <div class="agent-card">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span class="badge badge-emerald">${escapeHtml(app.ticket_id || 'DEV')} • /${escapeHtml(app.slug)}/</span>
+                <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">${escapeHtml(app.created_at || '')}</span>
+              </div>
+              <div style="font-size:15.5px;font-weight:800;color:var(--text-main);margin-bottom:6px;">
+                ${escapeHtml(app.title)}
+              </div>
+              <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+                ${escapeHtml((app.description || '').slice(0, 150))}
+              </div>
+              <div style="font-size:12px;color:#cbd5e1;margin-bottom:12px;">
+                Collaborators: <strong>${escapeHtml(app.agent_avatar || '✴️')} ${escapeHtml(app.agent_name || 'Claude-01 + Hermes-01')}</strong><br>
+                LLM Engine: <code>${escapeHtml(app.model || 'qwen2.5-coder:14b')}</code>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" style="flex:1;justify-content:center;" onclick="openPreviewModal('${escapeHtml(siteUrl)}', '${escapeHtml(app.title)}')">
+                👁️ Preview Inline
+              </button>
+              <a href="${escapeHtml(siteUrl)}" target="_blank" class="btn btn-emerald" style="flex:1;justify-content:center;">
+                🚀 Open Site ↗
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openPreviewModal(url, title) {
+      document.getElementById('previewModalTitle').textContent = title;
+      document.getElementById('previewModalOpenBtn').href = url;
+      document.getElementById('previewModalFrame').src = url;
+      document.getElementById('previewModal').style.display = 'flex';
+    }
+
+    function closePreviewModal() {
+      document.getElementById('previewModalFrame').src = 'about:blank';
+      document.getElementById('previewModal').style.display = 'none';
+    }
+
+    function renderHistoryTable() {
+      if (!obsData) return;
+      const mode = document.getElementById('filterAgentSelect').value;
+      const q = (document.getElementById('filterSearchInput').value || '').toLowerCase().trim();
+      let rows = obsData.history || [];
+
+      if (mode === 'CLAUDE') {
+        rows = rows.filter(r => r.agents_label.toLowerCase().includes('claude') || r.assigned_to.toLowerCase().includes('claude'));
+      } else if (mode === 'HERMES') {
+        rows = rows.filter(r => r.agents_label.toLowerCase().includes('hermes') || r.assigned_to.toLowerCase().includes('hermes'));
+      } else if (mode === 'COOP') {
+        rows = rows.filter(r => r.is_coop);
+      } else if (mode === 'DEV_SITE') {
+        rows = rows.filter(r => r.dev_url);
+      }
+
+      if (selectedAgentFilter) {
+        rows = rows.filter(r =>
+          r.assigned_to.toLowerCase().includes(selectedAgentFilter.toLowerCase()) ||
+          r.agents_label.toLowerCase().includes(selectedAgentFilter.toLowerCase())
+        );
+      }
+
+      if (q) {
+        rows = rows.filter(r =>
+          (r.id || '').toLowerCase().includes(q) ||
+          (r.title || '').toLowerCase().includes(q) ||
+          (r.agents_label || '').toLowerCase().includes(q) ||
+          (r.model || '').toLowerCase().includes(q) ||
+          (r.skill || '').toLowerCase().includes(q)
+        );
+      }
+
+      document.getElementById('historyCountBadge').textContent = `${rows.length} Records`;
+      const tbody = document.getElementById('historyTableBody');
+      tbody.innerHTML = rows.map(r => {
+        const coopTag = r.is_coop
+          ? `<span class="badge badge-coop">🤝 2-Phase Co-Op</span>`
+          : `<span class="badge">Solo Execution</span>`;
+        const siteBtn = r.dev_url
+          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+               <a href="${escapeHtml(r.dev_url)}" target="_blank" class="btn btn-emerald" style="padding:4px 9px;font-size:11px;">🚀 Open Website ↗</a>
+               <button class="btn" style="padding:4px 9px;font-size:11px;" onclick="openPreviewModal('${escapeHtml(r.dev_url)}', '${escapeHtml(r.title)}')">👁️ Preview</button>
+             </div>`
+          : `<span class="badge badge-emerald">✓ ${escapeHtml(r.status)}</span>`;
+
+        const traceHtml = (r.steps && r.steps.length > 0)
+          ? `<details style="margin-top:6px;">
+               <summary style="cursor:pointer;color:var(--cyan);font-size:11px;font-family:monospace;">📜 View ${r.steps.length} Collaboration Steps</summary>
+               <div style="margin-top:5px;padding:6px 8px;background:#060913;border-radius:6px;font-family:monospace;font-size:11px;">
+                 ${r.steps.map(s => `<div><strong style="color:var(--cyan);">${escapeHtml(s.step)}</strong>: ${escapeHtml(s.detail)} (${escapeHtml(s.time)})</div>`).join('')}
+               </div>
+             </details>`
+          : '';
+
+        return `
+          <tr>
+            <td style="font-family:monospace;white-space:nowrap;">
+              <strong style="color:var(--cyan);">${escapeHtml(r.id)}</strong><br>
+              <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.updated_at)}</span>
+            </td>
+            <td>
+              <strong style="font-size:13.5px;color:#f8fafc;">${escapeHtml(r.title)}</strong>
+              <div style="font-size:11.5px;color:var(--text-sub);margin-top:3px;">${escapeHtml((r.description || '').slice(0, 140))}</div>
+              ${traceHtml}
+            </td>
+            <td>
+              <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(r.agents_label)}</div>
+              ${coopTag}
+            </td>
+            <td style="font-family:monospace;font-size:11.5px;color:#fdba74;">
+              ${escapeHtml(r.model)}
+            </td>
+            <td style="font-family:monospace;font-size:11.5px;white-space:nowrap;">
+              <strong>${(r.tokens || 0).toLocaleString()} tokens</strong><br>
+              <span style="color:var(--text-sub);">${((r.duration_ms || 0) / 1000).toFixed(1)}s • ${r.tok_per_sec || 0} tok/s</span>
+            </td>
+            <td>
+              ${r.skill ? `<span class="badge badge-claude">${escapeHtml(r.skill)}</span>` : '<span style="color:var(--text-muted);">—</span>'}
+            </td>
+            <td>
+              ${siteBtn}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // --- CANVAS CHARTS ---
+    function setupCanvas(id) {
+      const canvas = document.getElementById(id);
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(360, rect.width) * dpr;
+      canvas.height = Math.max(240, rect.height) * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return { ctx, w: Math.max(360, rect.width), h: Math.max(240, rect.height) };
+    }
+
+    function drawAllCharts() {
+      drawAgentWorkloadChart();
+      drawCollabHistoryChart();
+      drawResourcesChart();
+      drawSkillsGrowthChart();
+    }
+
+    function drawAgentWorkloadChart() {
+      const { ctx, w, h } = setupCanvas('chartAgentWorkload');
+      ctx.clearRect(0, 0, w, h);
+      const agents = (obsData.agents_detailed || []).slice(0, 7);
+      if (agents.length === 0) return;
+
+      const maxTok = Math.max(100, ...agents.map(a => a.tokens_used || 0));
+      const padL = 135, padR = 65, padT = 18, padB = 26;
+      const chartW = w - padL - padR;
+      const rowH = (h - padT - padB) / agents.length;
+
+      agents.forEach((a, i) => {
+        const y = padT + i * rowH;
+        const barH = Math.min(20, rowH * 0.58);
+        const barW = Math.max(6, ((a.tokens_used || 0) / maxTok) * chartW);
+
+        // Agent label
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '700 11.5px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${a.avatar || ''} ${a.name.slice(0, 16)}`, padL - 10, y + barH * 0.8);
+
+        // Track
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fillRect(padL, y, chartW, barH);
+
+        // Bar
+        const grad = ctx.createLinearGradient(padL, 0, padL + barW, 0);
+        if (a.name.toLowerCase().includes('claude')) {
+          grad.addColorStop(0, '#d97757');
+          grad.addColorStop(1, '#f59e0b');
+        } else if (a.name.toLowerCase().includes('hermes')) {
+          grad.addColorStop(0, '#a855f7');
+          grad.addColorStop(1, '#38bdf8');
+        } else {
+          grad.addColorStop(0, '#0284c7');
+          grad.addColorStop(1, '#10b981');
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(padL, y, barW, barH);
+
+        // Value
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '600 11px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${(a.tokens_used || 0).toLocaleString()} tok (${a.projects_count || 0})`, padL + barW + 6, y + barH * 0.8);
+      });
+    }
+
+    function drawCollabHistoryChart() {
+      const { ctx, w, h } = setupCanvas('chartCollabHistory');
+      ctx.clearRect(0, 0, w, h);
+      const hist = (obsData.history || []).slice(0, 12).reverse();
+      if (hist.length === 0) return;
+
+      const maxTok = Math.max(200, ...hist.map(r => r.tokens || 0));
+      const padL = 48, padR = 20, padT = 24, padB = 42;
+      const chartW = w - padL - padR;
+      const chartH = h - padT - padB;
+      const stepX = chartW / Math.max(1, hist.length);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) {
+        const gy = padT + (chartH / 4) * g;
+        ctx.beginPath();
+        ctx.moveTo(padL, gy);
+        ctx.lineTo(w - padR, gy);
+        ctx.stroke();
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(Math.round(maxTok * (1 - g / 4)), padL - 6, gy + 3);
+      }
+
+      // Bars for each ticket (Purple = Co-Op, Cyan/Orange = Solo)
+      hist.forEach((r, idx) => {
+        const x = padL + idx * stepX + stepX * 0.18;
+        const bw = Math.max(12, stepX * 0.64);
+        const bh = Math.max(6, ((r.tokens || 0) / maxTok) * chartH);
+        const y = padT + chartH - bh;
+
+        ctx.fillStyle = r.is_coop ? '#a855f7' : '#d97757';
+        ctx.fillRect(x, y, bw, bh);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(r.id, x + bw / 2, h - 16);
+      });
+
+      // Legend
+      ctx.fillStyle = '#a855f7';
+      ctx.fillRect(padL, 6, 10, 10);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Claude + Hermes Co-Op Ticket', padL + 15, 15);
+
+      ctx.fillStyle = '#d97757';
+      ctx.fillRect(padL + 195, 6, 10, 10);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText('Single-Agent Execution', padL + 210, 15);
+    }
+
+    function drawResourcesChart() {
+      const { ctx, w, h } = setupCanvas('chartResources');
+      ctx.clearRect(0, 0, w, h);
+      const res = obsData.resources || {};
+      const vramPct = Math.min(100, Math.round(((res.gpu_vram_used_gb || 0) / (res.gpu_vram_total_gb || 22)) * 100));
+      const metrics = [
+        { label: `GPU VRAM (${(res.gpu_vram_used_gb || 0).toFixed(1)}/${res.gpu_vram_total_gb || 22} GB)`, pct: vramPct, color: '#f59e0b' },
+        { label: `K3s System RAM (${res.ram_used_gb || 0}/${res.ram_total_gb || 0} GB)`, pct: res.ram_used_pct || 0, color: '#38bdf8' },
+        { label: `K3s Node CPU Load (${res.cpu_cores || 8} Cores)`, pct: res.cpu_load_pct || 0, color: '#10b981' },
+        { label: `NVMe AppData Storage (${res.disk_used_gb || 0}/${res.disk_total_gb || 0} GB)`, pct: res.disk_used_pct || 0, color: '#a855f7' }
+      ];
+
+      const padL = 215, padR = 55, padT = 22, padB = 20;
+      const chartW = w - padL - padR;
+      const rowH = (h - padT - padB) / metrics.length;
+
+      metrics.forEach((m, i) => {
+        const y = padT + i * rowH;
+        const barH = 22;
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '600 11.5px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(m.label, padL - 12, y + 15);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillRect(padL, y, chartW, barH);
+
+        const fillW = Math.max(4, (m.pct / 100) * chartW);
+        ctx.fillStyle = m.color;
+        ctx.fillRect(padL, y, fillW, barH);
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '700 11.5px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${m.pct}%`, padL + fillW + 8, y + 15);
+      });
+
+      // Populate GPU VRAM models breakdown cards below chart
+      const vramBox = document.getElementById('vramModelsBreakdown');
+      const psModels = res.gpu_ps_models || [];
+      vramBox.innerHTML = psModels.map(m => `
+        <div class="res-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:var(--amber);font-family:monospace;">🔥 ${escapeHtml(m.name)}</strong>
+            <span class="badge badge-claude">${m.vram_gb} GB VRAM</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;">
+            Params: <strong>${escapeHtml(m.parameter_size || '')}</strong> • Quant: <code>${escapeHtml(m.quantization || '')}</code> • Context: <strong>${Math.round((m.context_length || 32768) / 1024)}K</strong>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function drawSkillsGrowthChart() {
+      const { ctx, w, h } = setupCanvas('chartSkillsGrowth');
+      ctx.clearRect(0, 0, w, h);
+      const cats = obsData.skills_breakdown || [];
+      if (cats.length === 0) return;
+
+      const maxCount = Math.max(5, ...cats.map(c => c.count));
+      const padL = 175, padR = 55, padT = 20, padB = 20;
+      const chartW = w - padL - padR;
+      const rowH = (h - padT - padB) / cats.length;
+      const colors = ['#d97757', '#a855f7', '#38bdf8', '#10b981', '#f59e0b'];
+
+      cats.forEach((c, i) => {
+        const y = padT + i * rowH;
+        const barH = Math.min(22, rowH * 0.6);
+        const fillW = Math.max(8, (c.count / maxCount) * chartW);
+
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '600 11.5px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(c.category.slice(0, 24), padL - 10, y + barH * 0.8);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(padL, y, chartW, barH);
+
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect(padL, y, fillW, barH);
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '700 11px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${c.count} (${c.total_uses}x used)`, padL + fillW + 8, y + barH * 0.8);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      if (obsData) drawAllCharts();
+    });
+
+    fetchObservatory();
+    setInterval(fetchObservatory, 7000);
+  </script>
+</body>
+</html>
